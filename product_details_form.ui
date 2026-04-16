@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProductDetailsForm</class>
+ <widget class="QWidget" name="ProductDetailsForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>720</width>
+    <height>620</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Продукты — карточка (ЛР №2)</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+
+   <!-- ============================================== -->
+   <!-- Поиск / фильтрация                              -->
+   <!-- ============================================== -->
+   <item>
+    <widget class="QGroupBox" name="groupSearch">
+     <property name="title"><string>Поиск / фильтрация</string></property>
+     <layout class="QHBoxLayout" name="searchLayout">
+      <item>
+       <widget class="QLabel" name="labelSearchCol">
+        <property name="text"><string>Колонка:</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="comboColumn">
+        <item>
+         <property name="text"><string>Название</string></property>
+        </item>
+        <item>
+         <property name="text"><string>Ед. изм.</string></property>
+        </item>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="searchInput">
+        <property name="placeholderText">
+         <string>Введите значение для поиска…</string>
+        </property>
+        <property name="clearButtonEnabled"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnFind">
+        <property name="text"><string>🔍 Поиск</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="checkBoxFilter">
+        <property name="text"><string>Фильтр</string></property>
+        <property name="toolTip">
+         <string>Показывать только строки с точным совпадением</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnReset">
+        <property name="text"><string>Сброс</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ============================================== -->
+   <!-- Details                                          -->
+   <!-- ============================================== -->
+   <item>
+    <widget class="QGroupBox" name="groupDetails">
+     <property name="title">
+      <string>Карточка продукта (Details)</string>
+     </property>
+     <layout class="QHBoxLayout" name="detailsRoot">
+      <item>
+       <layout class="QFormLayout" name="formLayout">
+        <property name="labelAlignment">
+         <set>Qt::AlignRight|Qt::AlignVCenter</set>
+        </property>
+        <item row="0" column="0">
+         <widget class="QLabel" name="lblNumber">
+          <property name="text"><string>№ продукта:</string></property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="editNumber">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="toolTip">
+           <string>Первичный ключ, генерируется автоматически</string>
+          </property>
+          <property name="styleSheet">
+           <string>background:#eef; color:#444;</string>
+          </property>
+         </widget>
+        </item>
+
+        <!-- Название — ComboBox, т.к. поле ограничено CHECK-условием
+             ('сахар','мука','масло','молоко','хлеб') -->
+        <item row="1" column="0">
+         <widget class="QLabel" name="lblName">
+          <property name="text"><string>Название:</string></property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QComboBox" name="comboName">
+          <property name="toolTip">
+           <string>Допустимые значения ограничены CHECK-условием в БД</string>
+          </property>
+          <item><property name="text"><string>сахар</string></property></item>
+          <item><property name="text"><string>мука</string></property></item>
+          <item><property name="text"><string>масло</string></property></item>
+          <item><property name="text"><string>молоко</string></property></item>
+          <item><property name="text"><string>хлеб</string></property></item>
+         </widget>
+        </item>
+
+        <!-- Единицы — для демонстрации ListBox + ComboBox (как в методичке) -->
+        <item row="2" column="0">
+         <widget class="QLabel" name="lblUnits">
+          <property name="text"><string>Единицы:</string></property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QComboBox" name="comboUnits">
+          <property name="toolTip">
+           <string>ComboBox для удобства выбора (как в методичке ЛР №2)</string>
+          </property>
+          <item><property name="text"><string>кг</string></property></item>
+          <item><property name="text"><string>л</string></property></item>
+          <item><property name="text"><string>шт</string></property></item>
+         </widget>
+        </item>
+
+        <item row="3" column="0">
+         <widget class="QLabel" name="lblUnitsList">
+          <property name="text"><string>Единицы (ListBox):</string></property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QListWidget" name="listUnits">
+          <property name="maximumSize">
+           <size><width>16777215</width><height>80</height></size>
+          </property>
+          <property name="toolTip">
+           <string>Альтернативный список (демонстрация ListBox)</string>
+          </property>
+          <item><property name="text"><string>кг</string></property></item>
+          <item><property name="text"><string>л</string></property></item>
+          <item><property name="text"><string>шт</string></property></item>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ============================================== -->
+   <!-- DataGridView                                    -->
+   <!-- ============================================== -->
+   <item>
+    <widget class="QGroupBox" name="groupGrid">
+     <property name="title"><string>Список продуктов</string></property>
+     <layout class="QVBoxLayout" name="gridLayout">
+      <item>
+       <widget class="QTableView" name="tableView">
+        <property name="alternatingRowColors"><bool>true</bool></property>
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::SingleSelection</enum>
+        </property>
+        <property name="editTriggers">
+         <set>QAbstractItemView::NoEditTriggers</set>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QLabel" name="labelHint">
+     <property name="text">
+      <string>ℹ️ Допустимые названия: сахар, мука, масло, молоко, хлеб. Допустимые единицы: кг, л, шт.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="styleSheet">
+      <string>color: #555; font-style: italic; padding: 4px;</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
