@@ -1,0 +1,414 @@
+"""
+forms_ui.py — Формы приложения, загружаемые из .ui файлов (Qt Designer).
+
+Это альтернативная версия forms.py.
+Чтобы использовать .ui-формы, замените в main.py:
+    from forms import ...
+на:
+    from forms_ui import ...
+
+Все .ui файлы должны лежать в папке ui/ рядом с этим файлом.
+"""
+
+import os
+from PyQt5 import uic
+from PyQt5.QtWidgets import (
+    QWidget, QTableView, QMessageBox, QDialog, QAbstractItemView
+)
+from PyQt5.QtSql import (
+    QSqlTableModel, QSqlRelationalTableModel, QSqlRelation,
+    QSqlRelationalDelegate
+)
+from PyQt5.QtCore import Qt
+
+from widget import NavigationToolbar, ReadOnlyDelegate
+
+# Путь к папке с .ui файлами
+UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
+
+
+def ui_path(filename):
+    return os.path.join(UI_DIR, filename)
+
+
+# ============================================================
+#  Столбцы для поиска (имя в ComboBox → имя колонки в БД)
+# ============================================================
+BRANCH_SEARCH_COLS = {
+    "Название": "name", "Регион": "region",
+    "Населённый пункт": "locality", "Адрес": "address",
+    "Директор": "director's name"
+}
+
+PRODUCT_SEARCH_COLS = {
+    "Название": "name", "Ед. изм.": "units"
+}
+
+SHOP_SEARCH_COLS = {
+    "Название": "name", "Нас.пункт": "locality", "Улица": "street"
+}
+
+
+# ============================================================
+#  Вспомогательные функции
+# ============================================================
+def _connect_search(widget, model, col_map):
+    """Подключить виджеты поиска (searchInput, comboColumn, btnFind, btnReset)
+    к фильтрации модели."""
+
+    def apply_filter():
+        val = widget.searchInput.text().strip()
+        combo_text = widget.comboColumn.currentText()
+        col = col_map.get(combo_text, "name")
+        if val:
+            model.setFilter(f"\"{col}\"::text ILIKE '%{val}%'")
+        else:
+            model.setFilter("")
+        model.select()
+
+    def reset_filter():
+        widget.searchInput.clear()
+        model.setFilter("")
+        model.select()
+
+    widget.btnFind.clicked.connect(apply_filter)
+    widget.searchInput.returnPressed.connect(apply_filter)
+    widget.btnReset.clicked.connect(reset_filter)
+
+
+# ============================================================
+#  1. Форма «Филиалы» (Branch_office) — Singleton
+# ============================================================
+class BranchOfficeForm(QWidget):
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = cls()
+        cls._instance.show()
+        cls._instance.activateWindow()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(ui_path("branch_office_form.ui"), self)
+
+        # Модель
+        self.model = QSqlTableModel()
+        self.model.setTable('"Branch_office"')
+        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.model.select()
+
+        headers = {
+            0: "№", 1: "Название", 2: "Регион", 3: "Населённый пункт",
+            4: "Адрес", 5: "Дата открытия", 6: "Телефон",
+            7: "Директор", 8: "Фото"
+        }
+        for col, name in headers.items():
+            self.model.setHeaderData(col, Qt.Horizontal, name)
+
+        self.tableView.setModel(self.model)
+        self.tableView.setColumnHidden(8, True)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
+
+        # Навигация
+        self.navbar = NavigationToolbar(self.tableView, self.model, self)
+        self.layout().insertWidget(0, self.navbar)
+
+        # Поиск
+        _connect_search(self, self.model, BRANCH_SEARCH_COLS)
+
+
+# ============================================================
+#  2. Форма «Продукты» (Product) — Singleton
+# ============================================================
+class ProductForm(QWidget):
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = cls()
+        cls._instance.show()
+        cls._instance.activateWindow()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(ui_path("product_form.ui"), self)
+
+        self.model = QSqlTableModel()
+        self.model.setTable('"Product"')
+        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.model.select()
+
+        self.model.setHeaderData(0, Qt.Horizontal, "№")
+        self.model.setHeaderData(1, Qt.Horizontal, "Название")
+        self.model.setHeaderData(2, Qt.Horizontal, "Ед. изм.")
+
+        self.tableView.setModel(self.model)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
+
+        self.navbar = NavigationToolbar(self.tableView, self.model, self)
+        self.layout().insertWidget(0, self.navbar)
+
+        _connect_search(self, self.model, PRODUCT_SEARCH_COLS)
+
+
+# ============================================================
+#  3. Диалог выбора филиала
+# ============================================================
+class BranchSelectDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        uic.loadUi(ui_path("branch_select_dialog.ui"), self)
+        self.selected_id = None
+        self.selected_name = None
+
+        self.model = QSqlTableModel()
+        self.model.setTable('"Branch_office"')
+        self.model.select()
+
+        self.tableView.setModel(self.model)
+        self.tableView.setColumnHidden(8, True)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
+
+        self.btnSelect.clicked.connect(self._accept)
+        self.tableView.doubleClicked.connect(self._accept)
+
+    def _accept(self):
+        row = self.tableView.currentIndex().row()
+        if row >= 0:
+            self.selected_id = self.model.record(row).value("number")
+            self.selected_name = self.model.record(row).value("name")
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Внимание", "Выберите филиал!")
+
+
+# ============================================================
+#  4. Форма «Магазины» — Master-Detail + Lookup
+# ============================================================
+class ShopForm(QWidget):
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = cls()
+        cls._instance.show()
+        cls._instance.activateWindow()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(ui_path("shop_form.ui"), self)
+
+        # --- Master: Branch_office ---
+        self.master_model = QSqlTableModel()
+        self.master_model.setTable('"Branch_office"')
+        self.master_model.select()
+
+        headers_m = {0: "№", 1: "Название", 2: "Регион", 3: "Нас.пункт",
+                     4: "Адрес", 5: "Дата откр.", 6: "Телефон", 7: "Директор"}
+        for c, n in headers_m.items():
+            self.master_model.setHeaderData(c, Qt.Horizontal, n)
+
+        self.masterView.setModel(self.master_model)
+        self.masterView.setColumnHidden(8, True)
+        self.masterView.horizontalHeader().setStretchLastSection(True)
+        self.masterView.selectionModel().currentRowChanged.connect(
+            self._on_master_changed
+        )
+
+        # --- Detail: Shop с Lookup ---
+        self.detail_model = QSqlRelationalTableModel()
+        self.detail_model.setTable('"Shop"')
+        self.detail_model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.detail_model.setRelation(
+            8, QSqlRelation('"Branch_office"', 'number', 'name')
+        )
+        self.detail_model.select()
+
+        headers_d = {0: "№", 1: "Название", 2: "Нас.пункт", 3: "Улица",
+                     4: "Дом", 5: "Телефон", 6: "Открыт", 7: "Дата откр.",
+                     8: "Филиал"}
+        for c, n in headers_d.items():
+            self.detail_model.setHeaderData(c, Qt.Horizontal, n)
+
+        self.detailView.setModel(self.detail_model)
+        self.detailView.setItemDelegate(
+            QSqlRelationalDelegate(self.detailView)
+        )
+        self.detailView.horizontalHeader().setStretchLastSection(True)
+
+        # Навигация для detail
+        self.navbar = NavigationToolbar(
+            self.detailView, self.detail_model, self
+        )
+        # Вставить в detailLayout (внутри groupDetail)
+        self.groupDetail.layout().insertWidget(0, self.navbar)
+
+        # Поиск
+        _connect_search(self, self.detail_model, SHOP_SEARCH_COLS)
+
+        # Кнопка выбора филиала
+        self.btnSelectBranch.clicked.connect(self._select_branch)
+
+        # Выбрать первый филиал
+        if self.master_model.rowCount() > 0:
+            self.masterView.selectRow(0)
+
+    def _on_master_changed(self, current, previous):
+        if not current.isValid():
+            return
+        office_id = self.master_model.record(current.row()).value("number")
+        self.detail_model.setFilter(f'number_office = {office_id}')
+        self.detail_model.select()
+        self.labelStatus.setText(
+            f"Филиал №{office_id} — показано магазинов: "
+            f"{self.detail_model.rowCount()}"
+        )
+
+    def _select_branch(self):
+        dlg = BranchSelectDialog(self)
+        if dlg.exec_() == QDialog.Accepted and dlg.selected_id is not None:
+            row = self.detailView.currentIndex().row()
+            if row >= 0:
+                # Снять фильтр, чтобы можно было менять FK
+                self.detail_model.setFilter("")
+                self.detail_model.select()
+
+                # Записать selected_id (число) в колонку number_office
+                rec = self.detail_model.record(row)
+                rec.setValue("number_office", dlg.selected_id)
+                self.detail_model.setRecord(row, rec)
+
+                if not self.detail_model.submitAll():
+                    QMessageBox.critical(
+                        self, "Ошибка",
+                        self.detail_model.lastError().text()
+                    )
+                    self.detail_model.revertAll()
+                else:
+                    QMessageBox.information(
+                        self, "Готово",
+                        f"Магазину назначен филиал "
+                        f"«{dlg.selected_name}» (id={dlg.selected_id})."
+                    )
+                # Обновить обе таблицы
+                self.master_model.select()
+                if self.masterView.currentIndex().isValid():
+                    self._on_master_changed(
+                        self.masterView.currentIndex(), None
+                    )
+            else:
+                QMessageBox.warning(
+                    self, "Внимание",
+                    "Сначала выберите магазин в нижней таблице."
+                )
+
+
+# ============================================================
+#  5. Форма «Товары в магазинах» (M:M)
+# ============================================================
+class ShopProductForm(QWidget):
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = cls()
+        cls._instance.show()
+        cls._instance.activateWindow()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(ui_path("shop_product_form.ui"), self)
+
+        # --- Master: Shop ---
+        self.shop_model = QSqlTableModel()
+        self.shop_model.setTable('"Shop"')
+        self.shop_model.select()
+
+        shop_headers = {0: "№", 1: "Название", 2: "Нас.пункт", 3: "Улица",
+                        4: "Дом", 5: "Телефон", 6: "Открыт", 7: "Дата откр.",
+                        8: "Филиал (id)"}
+        for c, n in shop_headers.items():
+            self.shop_model.setHeaderData(c, Qt.Horizontal, n)
+
+        self.shopView.setModel(self.shop_model)
+        self.shopView.horizontalHeader().setStretchLastSection(True)
+        self.shopView.selectionModel().currentRowChanged.connect(
+            self._on_shop_changed
+        )
+
+        # --- Detail: Shop_Product с Lookup ---
+        self.sp_model = QSqlRelationalTableModel()
+        self.sp_model.setTable('"Shop_Product"')
+        self.sp_model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.sp_model.setRelation(
+            0, QSqlRelation('"Product"', 'number', 'name')
+        )
+        self.sp_model.select()
+
+        sp_headers = {0: "Продукт", 1: "Магазин (id)", 2: "Кол-во",
+                      3: "Цена за ед.", 4: "Выручка (авто)"}
+        for c, n in sp_headers.items():
+            self.sp_model.setHeaderData(c, Qt.Horizontal, n)
+
+        self.spView.setModel(self.sp_model)
+        self.spView.setItemDelegate(QSqlRelationalDelegate(self.spView))
+        self.spView.horizontalHeader().setStretchLastSection(True)
+
+        # Запретить редактирование вычисляемой колонки
+        self.spView.setItemDelegateForColumn(4, ReadOnlyDelegate(self.spView))
+
+        # Навигация
+        self.navbar = NavigationToolbar(self.spView, self.sp_model, self)
+        self.groupProducts.layout().insertWidget(0, self.navbar)
+
+        if self.shop_model.rowCount() > 0:
+            self.shopView.selectRow(0)
+
+    def _on_shop_changed(self, current, previous):
+        if not current.isValid():
+            return
+        shop_id = self.shop_model.record(current.row()).value("number")
+        self.sp_model.setFilter(f'num_shop = {shop_id}')
+        self.sp_model.select()
+
+
+# ============================================================
+#  6. Форма «Полная информация» (VIEW)
+# ============================================================
+class ShopFullInfoForm(QWidget):
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = cls()
+        cls._instance.show()
+        cls._instance.activateWindow()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi(ui_path("shop_full_info_form.ui"), self)
+
+        self.model = QSqlTableModel()
+        self.model.setTable("shop_full_info")
+        self.model.select()
+
+        headers = {0: "№", 1: "Название", 2: "Полный адрес",
+                   3: "Телефон", 4: "Открыт", 5: "Дата откр.", 6: "Филиал"}
+        for c, n in headers.items():
+            self.model.setHeaderData(c, Qt.Horizontal, n)
+
+        self.tableView.setModel(self.model)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
+
+        self.btnRefresh.clicked.connect(lambda: self.model.select())

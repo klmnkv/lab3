@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProductForm</class>
+ <widget class="QWidget" name="ProductForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>500</width>
+    <height>400</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Продукты (Product)</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <!-- Поиск -->
+   <item>
+    <layout class="QHBoxLayout" name="searchLayout">
+     <item>
+      <widget class="QLabel" name="labelSearch">
+       <property name="text"><string>🔍 Поиск:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="searchInput">
+       <property name="placeholderText">
+        <string>Введите значение...</string>
+       </property>
+       <property name="clearButtonEnabled"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="labelCol">
+       <property name="text"><string>в колонке:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboColumn">
+       <item><property name="text"><string>Название</string></property></item>
+       <item><property name="text"><string>Ед. изм.</string></property></item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnFind">
+       <property name="text"><string>Найти</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnReset">
+       <property name="text"><string>Сброс</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <!-- Таблица -->
+   <item>
+    <widget class="QTableView" name="tableView">
+     <property name="alternatingRowColors"><bool>true</bool></property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+    </widget>
+   </item>
+   <!-- Подсказка -->
+   <item>
+    <widget class="QLabel" name="labelHint">
+     <property name="text">
+      <string>ℹ️ Допустимые названия: сахар, мука, масло, молоко, хлеб. Единицы: кг, л, шт.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="styleSheet">
+      <string>color: #555; font-style: italic; padding: 4px;</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
