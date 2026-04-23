@@ -12,7 +12,8 @@ import re
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QTableView, QLabel, QLineEdit,
     QComboBox, QPushButton, QToolBar, QAction, QMessageBox,
-    QStyledItemDelegate, QAbstractItemView, QDoubleSpinBox
+    QStyledItemDelegate, QAbstractItemView, QDoubleSpinBox,
+    QApplication, QAbstractItemDelegate
 )
 from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -275,6 +276,13 @@ class NavigationToolbar(QToolBar):
                 self.record_saved.emit()
 
     def _save(self):
+        # Зафиксировать активный редактор в таблице (если пользователь
+        # нажал «Сохранить», не выходя из ячейки).
+        editor = QApplication.focusWidget()
+        if editor is not None and self._view.isAncestorOf(editor):
+            self._view.commitData(editor)
+            self._view.closeEditor(editor, QAbstractItemDelegate.NoHint)
+
         # Последняя линия обороны: если detail-модель отфильтрована
         # как "fk = N", дозаполнить NULL в этой колонке перед submitAll().
         implied = self._extract_simple_filter_value()
