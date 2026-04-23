@@ -266,20 +266,33 @@ class ShopForm(QWidget):
     def _autofill_office_on_insert(self, parent, first, last):
         """При добавлении новой строки в detail-таблицу Shop
         автоматически подставить number_office из выбранного
-        в master-таблице филиала."""
+        в master-таблице филиала.
+
+        Важно: колонка 8 — relation в QSqlRelationalTableModel.
+        setData на relation-колонке ожидает DISPLAY-значение
+        (название филиала), по нему Qt находит FK во внутреннем
+        dictionary. Передача сырого id числом приводит к
+        молчаливому false и row уходит в INSERT с NULL."""
         current = self.masterView.currentIndex()
         if not current.isValid():
             return
-        office_id = self.master_model.record(current.row()).value("number")
-        if office_id in (None, "", 0):
+        master_rec = self.master_model.record(current.row())
+        office_id = master_rec.value("number")
+        office_name = master_rec.value("name")
+        if office_id in (None, "", 0) or not office_name:
             return
         for row in range(first, last + 1):
             rec = self.detail_model.record(row)
             if rec.isNull("number_office"):
-                rec.setValue("number_office", office_id)
-                if rec.isNull("open"):
-                    rec.setValue("open", 1)   # BIT(1) — магазин открыт
-                self.detail_model.setRecord(row, rec)
+                # Relation column — пишем через setData с именем филиала
+                self.detail_model.setData(
+                    self.detail_model.index(row, 8),
+                    office_name, Qt.EditRole
+                )
+            if rec.isNull("open"):
+                self.detail_model.setData(
+                    self.detail_model.index(row, 6), 1, Qt.EditRole
+                )
 
     def _on_master_changed(self, current, previous):
         if not current.isValid():
@@ -324,9 +337,12 @@ class ShopForm(QWidget):
             )
             return
 
-        rec = self.detail_model.record(target_row)
-        rec.setValue("number_office", dlg.selected_id)
-        self.detail_model.setRecord(target_row, rec)
+        # Relation column — пишем DISPLAY-значение (имя филиала),
+        # по нему Qt найдёт FK в dictionary.
+        self.detail_model.setData(
+            self.detail_model.index(target_row, 8),
+            dlg.selected_name, Qt.EditRole
+        )
 
         if not self.detail_model.submitAll():
             QMessageBox.critical(
@@ -415,7 +431,9 @@ class ShopProductForm(QWidget):
 
     def _autofill_shop_on_insert(self, parent, first, last):
         """При добавлении новой строки в Shop_Product автоматически
-        подставить num_shop из выбранного магазина (master)."""
+        подставить num_shop из выбранного магазина (master).
+        num_shop — обычный INTEGER FK (не relation), setData принимает
+        сырое число."""
         current = self.shopView.currentIndex()
         if not current.isValid():
             return
@@ -425,8 +443,9 @@ class ShopProductForm(QWidget):
         for row in range(first, last + 1):
             rec = self.sp_model.record(row)
             if rec.isNull("num_shop"):
-                rec.setValue("num_shop", shop_id)
-                self.sp_model.setRecord(row, rec)
+                self.sp_model.setData(
+                    self.sp_model.index(row, 1), shop_id, Qt.EditRole
+                )
 
     def _on_shop_changed(self, current, previous):
         if not current.isValid():
