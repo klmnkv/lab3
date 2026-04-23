@@ -51,8 +51,8 @@ CREATE TABLE "Shop" (
     openning_date  DATE NOT NULL,
     number_office  INTEGER NOT NULL
                    REFERENCES "Branch_office"(number)
-                   ON UPDATE SET NULL
-                   ON DELETE SET NULL
+                   ON UPDATE RESTRICT
+                   ON DELETE RESTRICT
 );
 
 -- ============================================================

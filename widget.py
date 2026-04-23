@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QPushButton, QToolBar, QAction, QMessageBox,
     QStyledItemDelegate, QAbstractItemView
 )
-from PyQt5.QtSql import QSqlTableModel
+from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
@@ -33,11 +33,15 @@ class NavigationToolbar(QToolBar):
 
     record_saved = pyqtSignal()
     record_error = pyqtSignal(str)
+    row_inserted = pyqtSignal(int)  # номер свежедобавленной строки —
+                                    # форма может подставить дефолты (FK и т.п.)
 
     def __init__(self, view: QTableView, model: QSqlTableModel, parent=None):
         super().__init__("Навигация", parent)
         self._view = view
         self._model = model
+        self._server_generated_cols = None  # ленивый кэш IDENTITY/GENERATED колонок
+        self._column_defaults = None         # ленивый кэш DEFAULT для NOT NULL колонок
         self._lbl = QLabel(" Запись: 0 / 0 ")
         self._lbl.setStyleSheet(
             "font-weight: bold; padding: 0 8px; color: #2E4057;"
@@ -102,6 +106,10 @@ class NavigationToolbar(QToolBar):
         self._model.dataChanged.connect(self._update_label)
         self._update_label()
 
+        # Запретить редактирование серверно-генерируемых колонок
+        # (IDENTITY и GENERATED ALWAYS AS ... STORED).
+        self._apply_readonly_delegates()
+
     # --- Навигация ---
     def _first(self):
         if self._model.rowCount() > 0:
@@ -122,11 +130,114 @@ class NavigationToolbar(QToolBar):
         if n > 0:
             self._view.selectRow(n - 1)
 
+    def _apply_readonly_delegates(self):
+        """Навесить ReadOnlyDelegate на PK/GENERATED колонки, чтобы
+        пользователь не мог их отредактировать вручную — значения
+        выставляет сама БД."""
+        auto_cols = self._get_server_generated_cols()
+        if not auto_cols:
+            return
+        rec = self._model.record()
+        for name in auto_cols:
+            col = rec.indexOf(name)
+            if col >= 0:
+                self._view.setItemDelegateForColumn(
+                    col, ReadOnlyDelegate(self._view)
+                )
+
     # --- CRUD ---
+    def _get_server_generated_cols(self) -> set:
+        """Возвращает имена колонок, которые БД вычисляет сама
+        (IDENTITY и GENERATED ALWAYS AS ... STORED). Такие колонки
+        должны исключаться из INSERT, иначе PostgreSQL вернёт ошибку
+        «cannot insert a non-DEFAULT value» / «cannot insert into
+        generated column»."""
+        if self._server_generated_cols is not None:
+            return self._server_generated_cols
+
+        table = self._model.tableName().strip('"')
+        cols = set()
+        q = QSqlQuery()
+        q.prepare(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = :t "
+            "  AND (is_identity = 'YES' OR is_generated = 'ALWAYS')"
+        )
+        q.bindValue(":t", table)
+        if q.exec_():
+            while q.next():
+                cols.add(q.value(0))
+        self._server_generated_cols = cols
+        return cols
+
+    def _get_column_defaults(self) -> dict:
+        """Возвращает {column_name: default_value} для NOT NULL колонок
+        с DEFAULT, вычислив выражение на стороне PG (например,
+        '0.00'::money → '$0.00'). Нужно, чтобы свежедобавленная строка
+        не падала с not-null constraint на полях, которые пользователь
+        не тронул: Qt шлёт в INSERT все поля, и NULL не заменяется
+        на DEFAULT автоматически."""
+        if self._column_defaults is not None:
+            return self._column_defaults
+
+        table = self._model.tableName().strip('"')
+        result = {}
+        q = QSqlQuery()
+        q.prepare(
+            "SELECT column_name, column_default "
+            "FROM information_schema.columns "
+            "WHERE table_name = :t "
+            "  AND is_nullable = 'NO' "
+            "  AND column_default IS NOT NULL "
+            "  AND (is_identity IS NULL OR is_identity = 'NO') "
+            "  AND (is_generated IS NULL OR is_generated = 'NEVER')"
+        )
+        q.bindValue(":t", table)
+        if not q.exec_():
+            self._column_defaults = result
+            return result
+
+        exprs = []
+        while q.next():
+            exprs.append((q.value(0), q.value(1)))
+
+        for name, expr in exprs:
+            ev = QSqlQuery()
+            if ev.exec_(f"SELECT {expr}") and ev.next():
+                val = ev.value(0)
+                if val is not None:
+                    result[name] = val
+        self._column_defaults = result
+        return result
+
     def _add(self):
         row = self._model.rowCount()
-        self._model.insertRow(row)
+
+        # Строим пустую запись и помечаем серверно-генерируемые колонки
+        # как «not generated», чтобы они не попадали в INSERT.
+        rec = self._model.record()
+        auto_cols = self._get_server_generated_cols()
+        defaults = self._get_column_defaults()
+        for i in range(rec.count()):
+            field = rec.field(i)
+            name = field.name()
+            if name in auto_cols or field.isAutoValue():
+                rec.setGenerated(i, False)
+            elif name in defaults:
+                # Предзаполнить DEFAULT-значение, чтобы пользователь его видел
+                # и чтобы INSERT не падал на NOT NULL, если поле не тронуто.
+                rec.setValue(i, defaults[name])
+
+        if not self._model.insertRecord(row, rec):
+            error = self._model.lastError().text()
+            QMessageBox.critical(self, "Ошибка добавления", error)
+            self.record_error.emit(error)
+            return
+
         self._view.selectRow(row)
+        # Даём форме шанс подставить значения по умолчанию
+        # (например, FK в master-detail) до начала редактирования.
+        self.row_inserted.emit(row)
         # Начать редактирование первого редактируемого столбца
         self._view.edit(self._model.index(row, 1))
 
@@ -158,6 +269,12 @@ class NavigationToolbar(QToolBar):
             self._model.revertAll()
             self.record_error.emit(error_text)
         else:
+            # Перечитать данные из БД, чтобы подтянуть авто-сгенерированные
+            # PK/GENERATED колонки и синхронизировать кэш модели.
+            current_row = self._view.currentIndex().row()
+            self._model.select()
+            if 0 <= current_row < self._model.rowCount():
+                self._view.selectRow(current_row)
             self.record_saved.emit()
 
     def _revert(self):
