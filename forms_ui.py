@@ -231,6 +231,9 @@ class ShopForm(QWidget):
         )
         self.detail_model.select()
 
+        # Автоподстановка number_office при добавлении новой строки в Shop
+        self.detail_model.rowsInserted.connect(self._autofill_office_on_insert)
+
         headers_d = {0: "№", 1: "Название", 2: "Нас.пункт", 3: "Улица",
                      4: "Дом", 5: "Телефон", 6: "Открыт", 7: "Дата откр.",
                      8: "Филиал"}
@@ -249,8 +252,6 @@ class ShopForm(QWidget):
         )
         # Вставить в detailLayout (внутри groupDetail)
         self.groupDetail.layout().insertWidget(0, self.navbar)
-        # Подставлять FK number_office в новую строку из выбранного филиала
-        self.navbar.row_inserted.connect(self._fill_new_shop_defaults)
 
         # Поиск
         _connect_search(self, self.detail_model, SHOP_SEARCH_COLS)
@@ -262,17 +263,23 @@ class ShopForm(QWidget):
         if self.master_model.rowCount() > 0:
             self.masterView.selectRow(0)
 
-    def _fill_new_shop_defaults(self, row: int):
-        """Заполнить FK number_office у свежедобавленной строки
-        значением из текущего выбранного филиала (master).
-        Без этого submitAll() падает с not-null constraint."""
-        idx = self.masterView.currentIndex()
-        if not idx.isValid():
+    def _autofill_office_on_insert(self, parent, first, last):
+        """При добавлении новой строки в detail-таблицу Shop
+        автоматически подставить number_office из выбранного
+        в master-таблице филиала."""
+        current = self.masterView.currentIndex()
+        if not current.isValid():
             return
-        office_id = self.master_model.record(idx.row()).value("number")
-        rec = self.detail_model.record(row)
-        rec.setValue("number_office", office_id)
-        self.detail_model.setRecord(row, rec)
+        office_id = self.master_model.record(current.row()).value("number")
+        if office_id in (None, "", 0):
+            return
+        for row in range(first, last + 1):
+            rec = self.detail_model.record(row)
+            if rec.isNull("number_office"):
+                rec.setValue("number_office", office_id)
+                if rec.isNull("open"):
+                    rec.setValue("open", 1)   # BIT(1) — магазин открыт
+                self.detail_model.setRecord(row, rec)
 
     def _on_master_changed(self, current, previous):
         if not current.isValid():
@@ -287,41 +294,57 @@ class ShopForm(QWidget):
 
     def _select_branch(self):
         dlg = BranchSelectDialog(self)
-        if dlg.exec_() == QDialog.Accepted and dlg.selected_id is not None:
-            row = self.detailView.currentIndex().row()
-            if row >= 0:
-                # Снять фильтр, чтобы можно было менять FK
-                self.detail_model.setFilter("")
-                self.detail_model.select()
+        if dlg.exec_() != QDialog.Accepted or dlg.selected_id is None:
+            return
 
-                # Записать selected_id (число) в колонку number_office
-                rec = self.detail_model.record(row)
-                rec.setValue("number_office", dlg.selected_id)
-                self.detail_model.setRecord(row, rec)
+        row = self.detailView.currentIndex().row()
+        if row < 0:
+            QMessageBox.warning(
+                self, "Внимание",
+                "Сначала выберите магазин в нижней таблице."
+            )
+            return
 
-                if not self.detail_model.submitAll():
-                    QMessageBox.critical(
-                        self, "Ошибка",
-                        self.detail_model.lastError().text()
-                    )
-                    self.detail_model.revertAll()
-                else:
-                    QMessageBox.information(
-                        self, "Готово",
-                        f"Магазину назначен филиал "
-                        f"«{dlg.selected_name}» (id={dlg.selected_id})."
-                    )
-                # Обновить обе таблицы
-                self.master_model.select()
-                if self.masterView.currentIndex().isValid():
-                    self._on_master_changed(
-                        self.masterView.currentIndex(), None
-                    )
-            else:
-                QMessageBox.warning(
-                    self, "Внимание",
-                    "Сначала выберите магазин в нижней таблице."
-                )
+        # Сохранить PK магазина ДО снятия фильтра
+        shop_id = self.detail_model.record(row).value("number")
+
+        self.detail_model.setFilter("")
+        self.detail_model.select()
+
+        # Найти целевую строку по PK, а не по старому индексу
+        target_row = -1
+        for r in range(self.detail_model.rowCount()):
+            if self.detail_model.record(r).value("number") == shop_id:
+                target_row = r
+                break
+        if target_row < 0:
+            QMessageBox.warning(
+                self, "Ошибка",
+                "Не удалось найти магазин после перезагрузки."
+            )
+            return
+
+        rec = self.detail_model.record(target_row)
+        rec.setValue("number_office", dlg.selected_id)
+        self.detail_model.setRecord(target_row, rec)
+
+        if not self.detail_model.submitAll():
+            QMessageBox.critical(
+                self, "Ошибка",
+                self.detail_model.lastError().text()
+            )
+            self.detail_model.revertAll()
+        else:
+            QMessageBox.information(
+                self, "Готово",
+                f"Магазину назначен филиал «{dlg.selected_name}» "
+                f"(id={dlg.selected_id})."
+            )
+
+        # Обновить обе таблицы
+        self.master_model.select()
+        if self.masterView.currentIndex().isValid():
+            self._on_master_changed(self.masterView.currentIndex(), None)
 
 
 # ============================================================
@@ -368,6 +391,9 @@ class ShopProductForm(QWidget):
         )
         self.sp_model.select()
 
+        # Автоподстановка num_shop при добавлении новой строки в Shop_Product
+        self.sp_model.rowsInserted.connect(self._autofill_shop_on_insert)
+
         sp_headers = {0: "Продукт", 1: "Магазин (id)", 2: "Кол-во",
                       3: "Цена за ед.", 4: "Выручка (авто)"}
         for c, n in sp_headers.items():
@@ -383,22 +409,24 @@ class ShopProductForm(QWidget):
         # Навигация
         self.navbar = NavigationToolbar(self.spView, self.sp_model, self)
         self.groupProducts.layout().insertWidget(0, self.navbar)
-        # Подставлять FK num_shop в новую строку из выбранного магазина
-        self.navbar.row_inserted.connect(self._fill_new_sp_defaults)
 
         if self.shop_model.rowCount() > 0:
             self.shopView.selectRow(0)
 
-    def _fill_new_sp_defaults(self, row: int):
-        """Заполнить FK num_shop у свежедобавленной строки Shop_Product
-        значением из текущего выбранного магазина (master)."""
-        idx = self.shopView.currentIndex()
-        if not idx.isValid():
+    def _autofill_shop_on_insert(self, parent, first, last):
+        """При добавлении новой строки в Shop_Product автоматически
+        подставить num_shop из выбранного магазина (master)."""
+        current = self.shopView.currentIndex()
+        if not current.isValid():
             return
-        shop_id = self.shop_model.record(idx.row()).value("number")
-        rec = self.sp_model.record(row)
-        rec.setValue("num_shop", shop_id)
-        self.sp_model.setRecord(row, rec)
+        shop_id = self.shop_model.record(current.row()).value("number")
+        if shop_id in (None, "", 0):
+            return
+        for row in range(first, last + 1):
+            rec = self.sp_model.record(row)
+            if rec.isNull("num_shop"):
+                rec.setValue("num_shop", shop_id)
+                self.sp_model.setRecord(row, rec)
 
     def _on_shop_changed(self, current, previous):
         if not current.isValid():

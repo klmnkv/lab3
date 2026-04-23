@@ -27,7 +27,8 @@ import os
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QWidget, QMessageBox, QFileDialog, QDataWidgetMapper,
-    QAbstractItemView, QHeaderView, QStyledItemDelegate
+    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView,
+    QComboBox
 )
 from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
@@ -52,9 +53,14 @@ def ui_path(filename: str) -> str:
 #  уже хорошо; для QListWidget — нет, нужен делегат).
 # ============================================================
 class ComboTextDelegate(QStyledItemDelegate):
-    """Связывает ComboBox с моделью по тексту (а не по индексу)."""
+    """Связывает QComboBox с моделью по тексту (а не по индексу).
+    Для прочих виджетов (QLineEdit, QDateEdit и т.п.) — поведение
+    по умолчанию, чтобы можно было ставить делегат на mapper целиком."""
 
     def setEditorData(self, editor, index):
+        if not isinstance(editor, QComboBox):
+            super().setEditorData(editor, index)
+            return
         value = index.model().data(index, Qt.EditRole)
         if value is None:
             return
@@ -65,24 +71,10 @@ class ComboTextDelegate(QStyledItemDelegate):
             editor.setEditText(str(value))
 
     def setModelData(self, editor, model, index):
-        model.setData(index, editor.currentText(), Qt.EditRole)
-
-
-class ListWidgetTextDelegate(QStyledItemDelegate):
-    """Связывает QListWidget с моделью по тексту выделенного элемента."""
-
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Qt.EditRole)
-        if value is None:
+        if not isinstance(editor, QComboBox):
+            super().setModelData(editor, model, index)
             return
-        items = editor.findItems(str(value), Qt.MatchExactly)
-        if items:
-            editor.setCurrentItem(items[0])
-
-    def setModelData(self, editor, model, index):
-        item = editor.currentItem()
-        if item is not None:
-            model.setData(index, item.text(), Qt.EditRole)
+        model.setData(index, editor.currentText(), Qt.EditRole)
 
 
 # ============================================================
@@ -133,10 +125,15 @@ class BranchOfficeDetailsForm(QWidget):
         for col, name in headers.items():
             self.model.setHeaderData(col, Qt.Horizontal, name)
 
-        # Колонка фото (BYTEA) — скрыть в таблице
+        # Скрытый QTableView — нужен NavigationToolbar'у для управления
+        # текущей строкой и синхронизации с QDataWidgetMapper.
+        # В карточке (Details) список филиалов не показывается.
+        self.tableView = QTableView(self)
+        self.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableView.setModel(self.model)
-        self.tableView.setColumnHidden(8, True)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
+        self.tableView.hide()
 
         # ---------- Навигатор (аналог BindingNavigator) ----------
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
@@ -401,8 +398,15 @@ class ProductDetailsForm(QWidget):
         self.model.setHeaderData(1, Qt.Horizontal, "Название")
         self.model.setHeaderData(2, Qt.Horizontal, "Ед. изм.")
 
+        # Скрытый QTableView — нужен NavigationToolbar'у для управления
+        # текущей строкой и синхронизации с QDataWidgetMapper.
+        # В карточке (Details) список продуктов не показывается.
+        self.tableView = QTableView(self)
+        self.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableView.setModel(self.model)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
+        self.tableView.hide()
 
         # ---------- Навигатор ----------
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
@@ -414,21 +418,16 @@ class ProductDetailsForm(QWidget):
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
 
-        # Делегаты для виджетов с не-стандартным userProperty
+        # Делегат для ComboBox (name): связывает с моделью по тексту
         self._combo_delegate = ComboTextDelegate(self)
-        self._list_delegate = ListWidgetTextDelegate(self)
 
         self.mapper.addMapping(self.editNumber, 0)  # number — read-only
         self.mapper.addMapping(self.comboName,  1)  # name
-        self.mapper.addMapping(self.comboUnits, 2)  # units
-        # ListWidget — связан с теми же units. При выделении нужного
-        # элемента в списке — поле units тоже будет обновлено через mapper.
-        self.mapper.addMapping(self.listUnits,  2)
-
+        # Для units используется ListWidget. QDataWidgetMapper не
+        # умеет его мапить стандартно, поэтому синхронизируем вручную:
+        #   модель → список: в _on_row_changed
+        #   список → модель: в _on_list_units_changed
         self.mapper.setItemDelegate(self._combo_delegate)
-        # Дополнительно проставим делегат для ListWidget
-        # (общий делегат — ComboTextDelegate, но для listUnits подменим
-        # обработку через сигнал itemSelectionChanged)
         self.listUnits.itemSelectionChanged.connect(self._on_list_units_changed)
 
         self.tableView.selectionModel().currentRowChanged.connect(
@@ -462,15 +461,16 @@ class ProductDetailsForm(QWidget):
                 self.listUnits.blockSignals(False)
 
     def _on_list_units_changed(self):
-        """При выборе элемента в ListWidget — обновить ComboBox и модель."""
+        """При выборе единицы в ListWidget — записать значение в модель."""
         item = self.listUnits.currentItem()
         if item is None:
             return
-        text = item.text()
-        # Обновим ComboBox (он смаппирован → автоматически уйдёт в модель)
-        idx = self.comboUnits.findText(text)
-        if idx >= 0 and self.comboUnits.currentIndex() != idx:
-            self.comboUnits.setCurrentIndex(idx)
+        row = self.mapper.currentIndex()
+        if row < 0:
+            return
+        self.model.setData(
+            self.model.index(row, 2), item.text(), Qt.EditRole
+        )
 
     def _refresh_after_save(self):
         row = self.tableView.currentIndex().row()

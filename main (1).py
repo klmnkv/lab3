@@ -16,7 +16,7 @@ main.py — Главное приложение.
 
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QAction, QMessageBox, QLabel,
+    QApplication, QMainWindow, QAction, QMessageBox, QLabel, QMenu,
 )
 from PyQt5.QtSql import QSqlDatabase
 from PyQt5.QtCore import Qt
@@ -232,6 +232,30 @@ class MainWindow(QMainWindow):
     def _open_view(self):
         ShopFullInfoForm.instance()
         self.statusBar().showMessage("ЛР №3: shop_full_info", 3000)
+
+    def contextMenuEvent(self, event):
+        """Глобальное контекстное меню главного окна: список форм + «О программе»."""
+        menu = QMenu(self)
+
+        lab2 = menu.addMenu("📘 ЛР №2 (родительские таблицы)")
+        lab2.addAction("📁 Филиалы — карточка (Details)",
+                       self._open_branch_details)
+        lab2.addAction("📦 Продукты — карточка (Details)",
+                       self._open_product_details)
+
+        lab3 = menu.addMenu("📗 ЛР №3 (связанные таблицы)")
+        lab3.addAction("📁 Филиалы",                   self._open_branch)
+        lab3.addAction("🏪 Магазины (Master-Detail)",  self._open_shop)
+        lab3.addAction("📦 Продукты",                  self._open_product)
+        lab3.addAction("🛒 Товары в магазинах (M:M)",  self._open_shop_product)
+        lab3.addAction("📊 Полная информация (VIEW)",  self._open_view)
+
+        menu.addSeparator()
+
+        act_about = menu.addAction("ℹ️ О программе")
+        act_about.triggered.connect(self._about)
+
+        menu.exec_(event.globalPos())
 
     def _about(self):
         QMessageBox.about(
