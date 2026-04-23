@@ -19,7 +19,7 @@ from PyQt5.QtSql import (
     QSqlTableModel, QSqlRelationalTableModel, QSqlRelation,
     QSqlRelationalDelegate
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 
 from widget import NavigationToolbar, ReadOnlyDelegate
 
@@ -304,6 +304,12 @@ class ShopForm(QWidget):
             if not ok:
                 rec.setValue("number_office", office_id)
                 self.detail_model.setRecord(row, rec)
+            if rec.isNull("openning_date"):
+                self.detail_model.setData(
+                    self.detail_model.index(row, 7),
+                    QDate.currentDate(),
+                    Qt.EditRole
+                )
 
     def _prime_shop_insert(self, *args):
         """Перед фактическим INSERT гарантированно проставить FK филиала.
@@ -327,6 +333,9 @@ class ShopForm(QWidget):
         idx_fk = record.indexOf("number_office")
         if idx_fk >= 0:
             record.setValue(idx_fk, office_id)
+        idx_date = record.indexOf("openning_date")
+        if idx_date >= 0 and record.isNull(idx_date):
+            record.setValue(idx_date, QDate.currentDate())
 
     def _on_detail_row_inserted(self, row: int):
         """Страховка для вставки через NavigationToolbar.➕"""
@@ -345,6 +354,13 @@ class ShopForm(QWidget):
         if not ok and office_name:
             self.detail_model.setData(
                 self.detail_model.index(row, 8), office_name, Qt.EditRole
+            )
+        rec = self.detail_model.record(row)
+        if rec.isNull("openning_date"):
+            self.detail_model.setData(
+                self.detail_model.index(row, 7),
+                QDate.currentDate(),
+                Qt.EditRole
             )
 
     def _on_master_changed(self, current, previous):
