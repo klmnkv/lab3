@@ -41,6 +41,7 @@ class NavigationToolbar(QToolBar):
         self._view = view
         self._model = model
         self._server_generated_cols = None  # ленивый кэш IDENTITY/GENERATED колонок
+        self._column_defaults = None         # ленивый кэш DEFAULT для NOT NULL колонок
         self._lbl = QLabel(" Запись: 0 / 0 ")
         self._lbl.setStyleSheet(
             "font-weight: bold; padding: 0 8px; color: #2E4057;"
@@ -169,6 +170,46 @@ class NavigationToolbar(QToolBar):
         self._server_generated_cols = cols
         return cols
 
+    def _get_column_defaults(self) -> dict:
+        """Возвращает {column_name: default_value} для NOT NULL колонок
+        с DEFAULT, вычислив выражение на стороне PG (например,
+        '0.00'::money → '$0.00'). Нужно, чтобы свежедобавленная строка
+        не падала с not-null constraint на полях, которые пользователь
+        не тронул: Qt шлёт в INSERT все поля, и NULL не заменяется
+        на DEFAULT автоматически."""
+        if self._column_defaults is not None:
+            return self._column_defaults
+
+        table = self._model.tableName().strip('"')
+        result = {}
+        q = QSqlQuery()
+        q.prepare(
+            "SELECT column_name, column_default "
+            "FROM information_schema.columns "
+            "WHERE table_name = :t "
+            "  AND is_nullable = 'NO' "
+            "  AND column_default IS NOT NULL "
+            "  AND (is_identity IS NULL OR is_identity = 'NO') "
+            "  AND (is_generated IS NULL OR is_generated = 'NEVER')"
+        )
+        q.bindValue(":t", table)
+        if not q.exec_():
+            self._column_defaults = result
+            return result
+
+        exprs = []
+        while q.next():
+            exprs.append((q.value(0), q.value(1)))
+
+        for name, expr in exprs:
+            ev = QSqlQuery()
+            if ev.exec_(f"SELECT {expr}") and ev.next():
+                val = ev.value(0)
+                if val is not None:
+                    result[name] = val
+        self._column_defaults = result
+        return result
+
     def _add(self):
         row = self._model.rowCount()
 
@@ -176,10 +217,16 @@ class NavigationToolbar(QToolBar):
         # как «not generated», чтобы они не попадали в INSERT.
         rec = self._model.record()
         auto_cols = self._get_server_generated_cols()
+        defaults = self._get_column_defaults()
         for i in range(rec.count()):
             field = rec.field(i)
-            if field.name() in auto_cols or field.isAutoValue():
+            name = field.name()
+            if name in auto_cols or field.isAutoValue():
                 rec.setGenerated(i, False)
+            elif name in defaults:
+                # Предзаполнить DEFAULT-значение, чтобы пользователь его видел
+                # и чтобы INSERT не падал на NOT NULL, если поле не тронуто.
+                rec.setValue(i, defaults[name])
 
         if not self._model.insertRecord(row, rec):
             error = self._model.lastError().text()
