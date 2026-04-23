@@ -450,10 +450,11 @@ class MoneyDelegate(QStyledItemDelegate):
         editor.setValue(value)
 
     def setModelData(self, editor, model, index):
-        # Для PostgreSQL MONEY лучше передавать числовой QVariant,
-        # а не строку: строковый формат зависит от locale и может
-        # привести к "invalid input syntax for type money".
-        model.setData(index, float(editor.value()), Qt.EditRole)
+        # Для MONEY в ru_RU PostgreSQL ожидает десятичную запятую.
+        # Передаём строку в локальном формате, чтобы исключить 22P02
+        # на значениях вида "100.00".
+        money_text = f"{editor.value():.2f}".replace(".", ",")
+        model.setData(index, money_text, Qt.EditRole)
 
 
 # ============================================================
