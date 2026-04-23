@@ -27,6 +27,7 @@ from PyQt5.QtCore import Qt, QDate, QSortFilterProxyModel
 
 # Импорт переиспользуемых виджетов
 from widget import NavigationToolbar, SearchPanel, ReadOnlyDelegate, StatusLabel
+from widget import MoneyDelegate
 
 
 # ============================================================
@@ -547,6 +548,7 @@ class ShopProductForm(QWidget):
         self.sp_view = QTableView()
         self.sp_view.setModel(self.sp_model)
         self.sp_view.setItemDelegate(QSqlRelationalDelegate(self.sp_view))
+        self.sp_view.setItemDelegateForColumn(3, MoneyDelegate(self.sp_view))
         self.sp_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sp_view.setAlternatingRowColors(True)
         self.sp_view.horizontalHeader().setStretchLastSection(True)

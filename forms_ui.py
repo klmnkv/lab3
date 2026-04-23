@@ -21,7 +21,7 @@ from PyQt5.QtSql import (
 )
 from PyQt5.QtCore import Qt, QDate
 
-from widget import NavigationToolbar, ReadOnlyDelegate
+from widget import NavigationToolbar, ReadOnlyDelegate, MoneyDelegate
 
 # Путь к папке с .ui файлами
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
@@ -494,6 +494,7 @@ class ShopProductForm(QWidget):
 
         self.spView.setModel(self.sp_model)
         self.spView.setItemDelegate(QSqlRelationalDelegate(self.spView))
+        self.spView.setItemDelegateForColumn(3, MoneyDelegate(self.spView))
         self.spView.horizontalHeader().setStretchLastSection(True)
 
         # Запретить редактирование вычисляемой колонки

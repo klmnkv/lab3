@@ -12,7 +12,7 @@ import re
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QTableView, QLabel, QLineEdit,
     QComboBox, QPushButton, QToolBar, QAction, QMessageBox,
-    QStyledItemDelegate, QAbstractItemView
+    QStyledItemDelegate, QAbstractItemView, QDoubleSpinBox
 )
 from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -418,6 +418,31 @@ class ReadOnlyDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         return None  # Не создаём редактор → колонка read-only
+
+
+class MoneyDelegate(QStyledItemDelegate):
+    """Делегат редактирования MONEY через float-редактор."""
+
+    def createEditor(self, parent, option, index):
+        editor = QDoubleSpinBox(parent)
+        editor.setDecimals(2)
+        editor.setMinimum(0.0)
+        editor.setMaximum(1_000_000_000.0)
+        editor.setSingleStep(1.0)
+        return editor
+
+    def setEditorData(self, editor, index):
+        txt = str(index.model().data(index, Qt.EditRole) or "")
+        cleaned = "".join(ch for ch in txt if ch.isdigit() or ch in ",.-")
+        cleaned = cleaned.replace(",", ".")
+        try:
+            value = float(cleaned) if cleaned not in ("", "-", ".", "-.") else 0.0
+        except ValueError:
+            value = 0.0
+        editor.setValue(value)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, f"{editor.value():.2f}", Qt.EditRole)
 
 
 # ============================================================
