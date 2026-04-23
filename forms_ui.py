@@ -520,12 +520,20 @@ class ShopProductForm(QWidget):
         rel_product = self.sp_model.relationModel(0)
         product_name = None
         product_id = None
+        used_products = set()
+        for r in range(self.sp_model.rowCount()):
+            v = self.sp_model.record(r).value("num_product")
+            if v not in (None, "", 0):
+                used_products.add(v)
         if rel_product is not None:
             rel_product.select()
-            if rel_product.rowCount() > 0:
-                first_prod = rel_product.record(0)
-                product_id = first_prod.value("number")
-                product_name = first_prod.value("name")
+            for r in range(rel_product.rowCount()):
+                prod = rel_product.record(r)
+                pid = prod.value("number")
+                if pid not in used_products:
+                    product_id = pid
+                    product_name = prod.value("name")
+                    break
         for row in range(first, last + 1):
             rec = self.sp_model.record(row)
             if rec.isNull("num_shop"):
