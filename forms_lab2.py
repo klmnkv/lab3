@@ -27,7 +27,8 @@ import os
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QWidget, QMessageBox, QFileDialog, QDataWidgetMapper,
-    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView
+    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView,
+    QComboBox
 )
 from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
@@ -52,9 +53,14 @@ def ui_path(filename: str) -> str:
 #  уже хорошо; для QListWidget — нет, нужен делегат).
 # ============================================================
 class ComboTextDelegate(QStyledItemDelegate):
-    """Связывает ComboBox с моделью по тексту (а не по индексу)."""
+    """Связывает QComboBox с моделью по тексту (а не по индексу).
+    Для прочих виджетов (QLineEdit, QDateEdit и т.п.) — поведение
+    по умолчанию, чтобы можно было ставить делегат на mapper целиком."""
 
     def setEditorData(self, editor, index):
+        if not isinstance(editor, QComboBox):
+            super().setEditorData(editor, index)
+            return
         value = index.model().data(index, Qt.EditRole)
         if value is None:
             return
@@ -65,6 +71,9 @@ class ComboTextDelegate(QStyledItemDelegate):
             editor.setEditText(str(value))
 
     def setModelData(self, editor, model, index):
+        if not isinstance(editor, QComboBox):
+            super().setModelData(editor, model, index)
+            return
         model.setData(index, editor.currentText(), Qt.EditRole)
 
 
