@@ -60,15 +60,16 @@ def _connect_search(widget, model, col_map):
         val = widget.searchInput.text().strip()
         combo_text = widget.comboColumn.currentText()
         col = col_map.get(combo_text, "name")
+        base = getattr(widget, "_base_filter", "").strip()
+        parts = [base] if base else []
         if val:
-            model.setFilter(f"\"{col}\"::text ILIKE '%{val}%'")
-        else:
-            model.setFilter("")
+            parts.append(f"\"{col}\"::text ILIKE '%{val}%'")
+        model.setFilter(" AND ".join(parts))
         model.select()
 
     def reset_filter():
         widget.searchInput.clear()
-        model.setFilter("")
+        model.setFilter(getattr(widget, "_base_filter", "").strip())
         model.select()
 
     widget.btnFind.clicked.connect(apply_filter)
@@ -337,7 +338,15 @@ class ShopForm(QWidget):
         if not current.isValid():
             return
         office_id = self.master_model.record(current.row()).value("number")
-        self.detail_model.setFilter(f'number_office = {office_id}')
+        self._base_filter = f'number_office = {office_id}'
+        val = self.searchInput.text().strip()
+        if val:
+            col = SHOP_SEARCH_COLS.get(self.comboColumn.currentText(), "name")
+            self.detail_model.setFilter(
+                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{val}%'"
+            )
+        else:
+            self.detail_model.setFilter(self._base_filter)
         self.detail_model.select()
         self.labelStatus.setText(
             f"Филиал №{office_id} — показано магазинов: "
@@ -490,7 +499,15 @@ class ShopProductForm(QWidget):
         if not current.isValid():
             return
         shop_id = self.shop_model.record(current.row()).value("number")
-        self.sp_model.setFilter(f'num_shop = {shop_id}')
+        self._base_filter = f'num_shop = {shop_id}'
+        val = self.searchInput.text().strip()
+        if val:
+            col = SHOP_SEARCH_COLS.get(self.comboColumn.currentText(), "name")
+            self.sp_model.setFilter(
+                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{val}%'"
+            )
+        else:
+            self.sp_model.setFilter(self._base_filter)
         self.sp_model.select()
 
 
