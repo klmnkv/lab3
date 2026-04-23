@@ -118,35 +118,19 @@
          </widget>
         </item>
 
-        <!-- Единицы — для демонстрации ListBox + ComboBox (как в методичке) -->
+        <!-- Единицы — ListBox (поле ограничено CHECK-условием в БД) -->
         <item row="2" column="0">
          <widget class="QLabel" name="lblUnits">
           <property name="text"><string>Единицы:</string></property>
          </widget>
         </item>
         <item row="2" column="1">
-         <widget class="QComboBox" name="comboUnits">
-          <property name="toolTip">
-           <string>ComboBox для удобства выбора (как в методичке ЛР №2)</string>
-          </property>
-          <item><property name="text"><string>кг</string></property></item>
-          <item><property name="text"><string>л</string></property></item>
-          <item><property name="text"><string>шт</string></property></item>
-         </widget>
-        </item>
-
-        <item row="3" column="0">
-         <widget class="QLabel" name="lblUnitsList">
-          <property name="text"><string>Единицы (ListBox):</string></property>
-         </widget>
-        </item>
-        <item row="3" column="1">
          <widget class="QListWidget" name="listUnits">
           <property name="maximumSize">
            <size><width>16777215</width><height>80</height></size>
           </property>
           <property name="toolTip">
-           <string>Альтернативный список (демонстрация ListBox)</string>
+           <string>Допустимые значения: кг, л, шт</string>
           </property>
           <item><property name="text"><string>кг</string></property></item>
           <item><property name="text"><string>л</string></property></item>
