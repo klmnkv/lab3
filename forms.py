@@ -254,6 +254,8 @@ class ShopForm(QWidget):
 
         # Автоподстановка number_office при добавлении новой строки в Shop
         self.detail_model.rowsInserted.connect(self._autofill_office_on_insert)
+        # Надёжная подстановка FK непосредственно в QSqlRecord перед INSERT.
+        self.detail_model.primeInsert.connect(self._prime_shop_insert)
 
         headers_d = {0: "№", 1: "Название", 2: "Нас.пункт", 3: "Улица",
                      4: "Дом", 5: "Телефон", 6: "Открыт", 7: "Дата откр.",
@@ -341,6 +343,21 @@ class ShopForm(QWidget):
                 self.detail_model.setData(
                     self.detail_model.index(row, 6), 1, Qt.EditRole
                 )
+
+    def _prime_shop_insert(self, record):
+        """Перед фактическим INSERT гарантированно проставить FK филиала."""
+        current = self.master_view.currentIndex()
+        if not current.isValid():
+            return
+        office_id = self.master_model.record(current.row()).value("number")
+        if office_id in (None, "", 0):
+            return
+        idx_fk = record.indexOf("number_office")
+        if idx_fk >= 0:
+            record.setValue(idx_fk, office_id)
+        idx_open = record.indexOf("open")
+        if idx_open >= 0 and record.isNull(idx_open):
+            record.setValue(idx_open, 1)
 
     def _on_master_changed(self, current, previous):
         """При выборе филиала — фильтровать магазины."""
