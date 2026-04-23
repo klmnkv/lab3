@@ -304,10 +304,6 @@ class ShopForm(QWidget):
             if not ok:
                 rec.setValue("number_office", office_id)
                 self.detail_model.setRecord(row, rec)
-            if rec.isNull("open"):
-                self.detail_model.setData(
-                    self.detail_model.index(row, 6), 1, Qt.EditRole
-                )
 
     def _prime_shop_insert(self, *args):
         """Перед фактическим INSERT гарантированно проставить FK филиала.
@@ -331,9 +327,6 @@ class ShopForm(QWidget):
         idx_fk = record.indexOf("number_office")
         if idx_fk >= 0:
             record.setValue(idx_fk, office_id)
-        idx_open = record.indexOf("open")
-        if idx_open >= 0 and record.isNull(idx_open):
-            record.setValue(idx_open, 1)
 
     def _on_detail_row_inserted(self, row: int):
         """Страховка для вставки через NavigationToolbar.➕"""
@@ -353,7 +346,6 @@ class ShopForm(QWidget):
             self.detail_model.setData(
                 self.detail_model.index(row, 8), office_name, Qt.EditRole
             )
-        self.detail_model.setData(self.detail_model.index(row, 6), 1, Qt.EditRole)
 
     def _on_master_changed(self, current, previous):
         if not current.isValid():
