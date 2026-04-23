@@ -529,9 +529,15 @@ class ShopProductForm(QWidget):
             return
         shop_id = self.shop_model.record(current.row()).value("number")
         self._base_filter = f'num_shop = {shop_id}'
-        val = self.searchInput.text().strip()
-        if val:
-            col = SHOP_SEARCH_COLS.get(self.comboColumn.currentText(), "name")
+        # В этой форме может не быть блока поиска в .ui.
+        search_input = getattr(self, "searchInput", None)
+        combo = getattr(self, "comboColumn", None)
+        if search_input is not None:
+            val = search_input.text().strip()
+        else:
+            val = ""
+        if val and combo is not None:
+            col = SHOP_SEARCH_COLS.get(combo.currentText(), "name")
             self.sp_model.setFilter(
                 f"{self._base_filter} AND \"{col}\"::text ILIKE '%{val}%'"
             )
