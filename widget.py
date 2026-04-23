@@ -103,6 +103,10 @@ class NavigationToolbar(QToolBar):
         self._model.dataChanged.connect(self._update_label)
         self._update_label()
 
+        # Запретить редактирование серверно-генерируемых колонок
+        # (IDENTITY и GENERATED ALWAYS AS ... STORED).
+        self._apply_readonly_delegates()
+
     # --- Навигация ---
     def _first(self):
         if self._model.rowCount() > 0:
@@ -122,6 +126,21 @@ class NavigationToolbar(QToolBar):
         n = self._model.rowCount()
         if n > 0:
             self._view.selectRow(n - 1)
+
+    def _apply_readonly_delegates(self):
+        """Навесить ReadOnlyDelegate на PK/GENERATED колонки, чтобы
+        пользователь не мог их отредактировать вручную — значения
+        выставляет сама БД."""
+        auto_cols = self._get_server_generated_cols()
+        if not auto_cols:
+            return
+        rec = self._model.record()
+        for name in auto_cols:
+            col = rec.indexOf(name)
+            if col >= 0:
+                self._view.setItemDelegateForColumn(
+                    col, ReadOnlyDelegate(self._view)
+                )
 
     # --- CRUD ---
     def _get_server_generated_cols(self) -> set:
