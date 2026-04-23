@@ -27,7 +27,7 @@ import os
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QWidget, QMessageBox, QFileDialog, QDataWidgetMapper,
-    QAbstractItemView, QHeaderView, QStyledItemDelegate
+    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView
 )
 from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
@@ -133,10 +133,15 @@ class BranchOfficeDetailsForm(QWidget):
         for col, name in headers.items():
             self.model.setHeaderData(col, Qt.Horizontal, name)
 
-        # Колонка фото (BYTEA) — скрыть в таблице
+        # Скрытый QTableView — нужен NavigationToolbar'у для управления
+        # текущей строкой и синхронизации с QDataWidgetMapper.
+        # В карточке (Details) список филиалов не показывается.
+        self.tableView = QTableView(self)
+        self.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableView.setModel(self.model)
-        self.tableView.setColumnHidden(8, True)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
+        self.tableView.hide()
 
         # ---------- Навигатор (аналог BindingNavigator) ----------
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
@@ -401,8 +406,15 @@ class ProductDetailsForm(QWidget):
         self.model.setHeaderData(1, Qt.Horizontal, "Название")
         self.model.setHeaderData(2, Qt.Horizontal, "Ед. изм.")
 
+        # Скрытый QTableView — нужен NavigationToolbar'у для управления
+        # текущей строкой и синхронизации с QDataWidgetMapper.
+        # В карточке (Details) список продуктов не показывается.
+        self.tableView = QTableView(self)
+        self.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableView.setModel(self.model)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
+        self.tableView.hide()
 
         # ---------- Навигатор ----------
         self.navbar = NavigationToolbar(self.tableView, self.model, self)

@@ -159,31 +159,6 @@
     </widget>
    </item>
 
-   <!-- ============================================== -->
-   <!-- DataGridView                                    -->
-   <!-- ============================================== -->
-   <item>
-    <widget class="QGroupBox" name="groupGrid">
-     <property name="title"><string>Список продуктов</string></property>
-     <layout class="QVBoxLayout" name="gridLayout">
-      <item>
-       <widget class="QTableView" name="tableView">
-        <property name="alternatingRowColors"><bool>true</bool></property>
-        <property name="selectionBehavior">
-         <enum>QAbstractItemView::SelectRows</enum>
-        </property>
-        <property name="selectionMode">
-         <enum>QAbstractItemView::SingleSelection</enum>
-        </property>
-        <property name="editTriggers">
-         <set>QAbstractItemView::NoEditTriggers</set>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
