@@ -517,12 +517,30 @@ class ShopProductForm(QWidget):
         shop_id = self.shop_model.record(current.row()).value("number")
         if shop_id in (None, "", 0):
             return
+        rel_product = self.sp_model.relationModel(0)
+        product_name = None
+        product_id = None
+        if rel_product is not None:
+            rel_product.select()
+            if rel_product.rowCount() > 0:
+                first_prod = rel_product.record(0)
+                product_id = first_prod.value("number")
+                product_name = first_prod.value("name")
         for row in range(first, last + 1):
             rec = self.sp_model.record(row)
             if rec.isNull("num_shop"):
                 self.sp_model.setData(
                     self.sp_model.index(row, 1), shop_id, Qt.EditRole
                 )
+            if rec.isNull("num_product"):
+                ok = False
+                if product_name:
+                    ok = self.sp_model.setData(
+                        self.sp_model.index(row, 0), product_name, Qt.EditRole
+                    )
+                if not ok and product_id not in (None, "", 0):
+                    rec.setValue("num_product", product_id)
+                    self.sp_model.setRecord(row, rec)
 
     def _on_shop_changed(self, current, previous):
         if not current.isValid():
