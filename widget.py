@@ -233,14 +233,12 @@ class NavigationToolbar(QToolBar):
         # подставляем это значение в новую запись. Это критично для
         # master-detail сценариев (например, Shop.number_office),
         # где FK обязателен и должен наследоваться от фильтра detail.
-        filter_expr = (self._model.filter() or "").strip()
-        m = re.fullmatch(r'("?[\w]+"\.?[\w]*|[\w]+)\s*=\s*(\d+)', filter_expr)
-        if m:
-            col_ref, raw_val = m.groups()
-            col_name = col_ref.split(".")[-1].replace('"', "")
+        implied = self._extract_simple_filter_value()
+        if implied:
+            col_name, val = implied
             idx = rec.indexOf(col_name)
             if idx >= 0 and rec.isNull(idx):
-                rec.setValue(idx, int(raw_val))
+                rec.setValue(idx, val)
 
         if not self._model.insertRecord(row, rec):
             error = self._model.lastError().text()
@@ -277,6 +275,19 @@ class NavigationToolbar(QToolBar):
                 self.record_saved.emit()
 
     def _save(self):
+        # Последняя линия обороны: если detail-модель отфильтрована
+        # как "fk = N", дозаполнить NULL в этой колонке перед submitAll().
+        implied = self._extract_simple_filter_value()
+        if implied:
+            col_name, val = implied
+            col = self._model.record().indexOf(col_name)
+            if col >= 0:
+                for row in range(self._model.rowCount()):
+                    if self._model.record(row).isNull(col_name):
+                        self._model.setData(
+                            self._model.index(row, col), val, Qt.EditRole
+                        )
+
         if not self._model.submitAll():
             error_text = self._model.lastError().text()
             QMessageBox.critical(self, "Ошибка сохранения", error_text)
@@ -290,6 +301,16 @@ class NavigationToolbar(QToolBar):
             if 0 <= current_row < self._model.rowCount():
                 self._view.selectRow(current_row)
             self.record_saved.emit()
+
+    def _extract_simple_filter_value(self):
+        """Вернуть (column_name, int_value) для фильтра вида `col = 123`."""
+        filter_expr = (self._model.filter() or "").strip()
+        m = re.fullmatch(r'("?[\w]+"\.?[\w]*|[\w]+)\s*=\s*(\d+)', filter_expr)
+        if not m:
+            return None
+        col_ref, raw_val = m.groups()
+        col_name = col_ref.split(".")[-1].replace('"', "")
+        return col_name, int(raw_val)
 
     def _revert(self):
         self._model.revertAll()
