@@ -27,7 +27,8 @@ import os
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QWidget, QMessageBox, QFileDialog, QDataWidgetMapper,
-    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView
+    QAbstractItemView, QHeaderView, QStyledItemDelegate, QTableView,
+    QMenu, QAction
 )
 from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
@@ -366,6 +367,48 @@ class BranchOfficeDetailsForm(QWidget):
         if self.model.rowCount() > 0:
             self.tableView.selectRow(0)
 
+    # ------------------------------------------------------------
+    #  Контекстное меню (ContextMenuStrip-аналог) — правая кнопка
+    # ------------------------------------------------------------
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+
+        act_add = QAction("➕ Добавить запись", self)
+        act_add.triggered.connect(self.navbar._add)
+        menu.addAction(act_add)
+
+        act_del = QAction("❌ Удалить запись", self)
+        act_del.triggered.connect(self.navbar._delete)
+        menu.addAction(act_del)
+
+        menu.addSeparator()
+
+        act_save = QAction("💾 Сохранить", self)
+        act_save.triggered.connect(self.navbar._save)
+        menu.addAction(act_save)
+
+        act_revert = QAction("↩️ Отменить изменения", self)
+        act_revert.triggered.connect(self.navbar._revert)
+        menu.addAction(act_revert)
+
+        menu.addSeparator()
+
+        act_photo = QAction("📂 Открыть фото…", self)
+        act_photo.triggered.connect(self._open_photo)
+        menu.addAction(act_photo)
+
+        act_clear_photo = QAction("🗑 Очистить фото", self)
+        act_clear_photo.triggered.connect(self._clear_photo)
+        menu.addAction(act_clear_photo)
+
+        menu.addSeparator()
+
+        act_refresh = QAction("🔄 Обновить из БД", self)
+        act_refresh.triggered.connect(self.model.select)
+        menu.addAction(act_refresh)
+
+        menu.exec_(event.globalPos())
+
 
 # ============================================================
 #  2. Форма «Продукты (Details)» — Product
@@ -530,3 +573,35 @@ class ProductDetailsForm(QWidget):
         self.model.select()
         if self.model.rowCount() > 0:
             self.tableView.selectRow(0)
+
+    # ------------------------------------------------------------
+    #  Контекстное меню (ContextMenuStrip-аналог) — правая кнопка
+    # ------------------------------------------------------------
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+
+        act_add = QAction("➕ Добавить запись", self)
+        act_add.triggered.connect(self.navbar._add)
+        menu.addAction(act_add)
+
+        act_del = QAction("❌ Удалить запись", self)
+        act_del.triggered.connect(self.navbar._delete)
+        menu.addAction(act_del)
+
+        menu.addSeparator()
+
+        act_save = QAction("💾 Сохранить", self)
+        act_save.triggered.connect(self.navbar._save)
+        menu.addAction(act_save)
+
+        act_revert = QAction("↩️ Отменить изменения", self)
+        act_revert.triggered.connect(self.navbar._revert)
+        menu.addAction(act_revert)
+
+        menu.addSeparator()
+
+        act_refresh = QAction("🔄 Обновить из БД", self)
+        act_refresh.triggered.connect(self.model.select)
+        menu.addAction(act_refresh)
+
+        menu.exec_(event.globalPos())
