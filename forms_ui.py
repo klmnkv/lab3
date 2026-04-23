@@ -307,8 +307,19 @@ class ShopForm(QWidget):
                     self.detail_model.index(row, 6), 1, Qt.EditRole
                 )
 
-    def _prime_shop_insert(self, record):
-        """Перед фактическим INSERT гарантированно проставить FK филиала."""
+    def _prime_shop_insert(self, *args):
+        """Перед фактическим INSERT гарантированно проставить FK филиала.
+
+        В PyQt сигнал primeInsert может приходить как:
+          - primeInsert(QSqlRecord)
+          - primeInsert(int, QSqlRecord)
+        Поэтому извлекаем QSqlRecord из args безопасно.
+        """
+        if not args:
+            return
+        record = args[-1]
+        if not hasattr(record, "indexOf"):
+            return
         current = self.masterView.currentIndex()
         if not current.isValid():
             return
