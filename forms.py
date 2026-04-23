@@ -283,6 +283,7 @@ class ShopForm(QWidget):
         self.navbar = NavigationToolbar(
             self.detail_view, self.detail_model, self
         )
+        self.navbar.row_inserted.connect(self._on_detail_row_inserted)
 
         sep = self.navbar.addSeparator()
         btn_select = QAction("📋 Выбрать филиал...", self)
@@ -369,6 +370,26 @@ class ShopForm(QWidget):
         idx_open = record.indexOf("open")
         if idx_open >= 0 and record.isNull(idx_open):
             record.setValue(idx_open, 1)
+
+    def _on_detail_row_inserted(self, row: int):
+        """Страховка для вставки через NavigationToolbar.➕"""
+        current = self.master_view.currentIndex()
+        if not current.isValid():
+            return
+        master_rec = self.master_model.record(current.row())
+        office_id = master_rec.value("number")
+        office_name = master_rec.value("name")
+        if office_id in (None, "", 0):
+            return
+        # Для relation-колонки пробуем сначала RAW FK, затем display name.
+        ok = self.detail_model.setData(
+            self.detail_model.index(row, 8), office_id, Qt.EditRole
+        )
+        if not ok and office_name:
+            self.detail_model.setData(
+                self.detail_model.index(row, 8), office_name, Qt.EditRole
+            )
+        self.detail_model.setData(self.detail_model.index(row, 6), 1, Qt.EditRole)
 
     def _on_master_changed(self, current, previous):
         """При выборе филиала — фильтровать магазины."""

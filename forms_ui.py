@@ -255,6 +255,7 @@ class ShopForm(QWidget):
         )
         # Вставить в detailLayout (внутри groupDetail)
         self.groupDetail.layout().insertWidget(0, self.navbar)
+        self.navbar.row_inserted.connect(self._on_detail_row_inserted)
 
         # Поиск
         _connect_search(self, self.detail_model, SHOP_SEARCH_COLS)
@@ -333,6 +334,26 @@ class ShopForm(QWidget):
         idx_open = record.indexOf("open")
         if idx_open >= 0 and record.isNull(idx_open):
             record.setValue(idx_open, 1)
+
+    def _on_detail_row_inserted(self, row: int):
+        """Страховка для вставки через NavigationToolbar.➕"""
+        current = self.masterView.currentIndex()
+        if not current.isValid():
+            return
+        master_rec = self.master_model.record(current.row())
+        office_id = master_rec.value("number")
+        office_name = master_rec.value("name")
+        if office_id in (None, "", 0):
+            return
+        # Для relation-колонки пробуем сначала RAW FK, затем display name.
+        ok = self.detail_model.setData(
+            self.detail_model.index(row, 8), office_id, Qt.EditRole
+        )
+        if not ok and office_name:
+            self.detail_model.setData(
+                self.detail_model.index(row, 8), office_name, Qt.EditRole
+            )
+        self.detail_model.setData(self.detail_model.index(row, 6), 1, Qt.EditRole)
 
     def _on_master_changed(self, current, previous):
         if not current.isValid():
