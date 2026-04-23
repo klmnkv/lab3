@@ -278,6 +278,8 @@ class ShopForm(QWidget):
         self.navbar = NavigationToolbar(
             self.detail_view, self.detail_model, self
         )
+        # Подставлять FK number_office в новую строку из выбранного филиала
+        self.navbar.row_inserted.connect(self._fill_new_shop_defaults)
 
         sep = self.navbar.addSeparator()
         btn_select = QAction("📋 Выбрать филиал...", self)
@@ -295,6 +297,17 @@ class ShopForm(QWidget):
         # Выбрать первый филиал
         if self.master_model.rowCount() > 0:
             self.master_view.selectRow(0)
+
+    def _fill_new_shop_defaults(self, row: int):
+        """Заполнить FK number_office у свежедобавленной строки
+        значением из текущего выбранного филиала (master)."""
+        idx = self.master_view.currentIndex()
+        if not idx.isValid():
+            return
+        office_id = self.master_model.record(idx.row()).value("number")
+        rec = self.detail_model.record(row)
+        rec.setValue("number_office", office_id)
+        self.detail_model.setRecord(row, rec)
 
     def _on_master_changed(self, current, previous):
         """При выборе филиала — фильтровать магазины."""
@@ -431,6 +444,8 @@ class ShopProductForm(QWidget):
         sp_layout.addWidget(self.sp_view)
 
         self.navbar = NavigationToolbar(self.sp_view, self.sp_model, self)
+        # Подставлять FK num_shop в новую строку из выбранного магазина
+        self.navbar.row_inserted.connect(self._fill_new_sp_defaults)
         sp_layout.insertWidget(0, self.navbar)
 
         splitter.addWidget(sp_group)
@@ -458,6 +473,17 @@ class ShopProductForm(QWidget):
         shop_id = self.shop_model.record(current.row()).value("number")
         self.sp_model.setFilter(f'num_shop = {shop_id}')
         self.sp_model.select()
+
+    def _fill_new_sp_defaults(self, row: int):
+        """Заполнить FK num_shop у свежедобавленной строки Shop_Product
+        значением из текущего выбранного магазина (master)."""
+        idx = self.shop_view.currentIndex()
+        if not idx.isValid():
+            return
+        shop_id = self.shop_model.record(idx.row()).value("number")
+        rec = self.sp_model.record(row)
+        rec.setValue("num_shop", shop_id)
+        self.sp_model.setRecord(row, rec)
 
 
 # ============================================================

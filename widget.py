@@ -33,6 +33,8 @@ class NavigationToolbar(QToolBar):
 
     record_saved = pyqtSignal()
     record_error = pyqtSignal(str)
+    row_inserted = pyqtSignal(int)  # номер свежедобавленной строки —
+                                    # форма может подставить дефолты (FK и т.п.)
 
     def __init__(self, view: QTableView, model: QSqlTableModel, parent=None):
         super().__init__("Навигация", parent)
@@ -186,6 +188,9 @@ class NavigationToolbar(QToolBar):
             return
 
         self._view.selectRow(row)
+        # Даём форме шанс подставить значения по умолчанию
+        # (например, FK в master-detail) до начала редактирования.
+        self.row_inserted.emit(row)
         # Начать редактирование первого редактируемого столбца
         self._view.edit(self._model.index(row, 1))
 

@@ -249,6 +249,8 @@ class ShopForm(QWidget):
         )
         # Вставить в detailLayout (внутри groupDetail)
         self.groupDetail.layout().insertWidget(0, self.navbar)
+        # Подставлять FK number_office в новую строку из выбранного филиала
+        self.navbar.row_inserted.connect(self._fill_new_shop_defaults)
 
         # Поиск
         _connect_search(self, self.detail_model, SHOP_SEARCH_COLS)
@@ -259,6 +261,18 @@ class ShopForm(QWidget):
         # Выбрать первый филиал
         if self.master_model.rowCount() > 0:
             self.masterView.selectRow(0)
+
+    def _fill_new_shop_defaults(self, row: int):
+        """Заполнить FK number_office у свежедобавленной строки
+        значением из текущего выбранного филиала (master).
+        Без этого submitAll() падает с not-null constraint."""
+        idx = self.masterView.currentIndex()
+        if not idx.isValid():
+            return
+        office_id = self.master_model.record(idx.row()).value("number")
+        rec = self.detail_model.record(row)
+        rec.setValue("number_office", office_id)
+        self.detail_model.setRecord(row, rec)
 
     def _on_master_changed(self, current, previous):
         if not current.isValid():
@@ -369,9 +383,22 @@ class ShopProductForm(QWidget):
         # Навигация
         self.navbar = NavigationToolbar(self.spView, self.sp_model, self)
         self.groupProducts.layout().insertWidget(0, self.navbar)
+        # Подставлять FK num_shop в новую строку из выбранного магазина
+        self.navbar.row_inserted.connect(self._fill_new_sp_defaults)
 
         if self.shop_model.rowCount() > 0:
             self.shopView.selectRow(0)
+
+    def _fill_new_sp_defaults(self, row: int):
+        """Заполнить FK num_shop у свежедобавленной строки Shop_Product
+        значением из текущего выбранного магазина (master)."""
+        idx = self.shopView.currentIndex()
+        if not idx.isValid():
+            return
+        shop_id = self.shop_model.record(idx.row()).value("number")
+        rec = self.sp_model.record(row)
+        rec.setValue("num_shop", shop_id)
+        self.sp_model.setRecord(row, rec)
 
     def _on_shop_changed(self, current, previous):
         if not current.isValid():
