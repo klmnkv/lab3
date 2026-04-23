@@ -280,8 +280,19 @@ class NavigationToolbar(QToolBar):
         # нажал «Сохранить», не выходя из ячейки).
         editor = QApplication.focusWidget()
         if editor is not None and self._view.isAncestorOf(editor):
-            self._view.commitData(editor)
-            self._view.closeEditor(editor, QAbstractItemDelegate.NoHint)
+            # Фокус может быть на дочернем QLineEdit внутри редактора
+            # (например, внутри QDoubleSpinBox). Поднимаемся до виджета,
+            # который является прямым ребёнком viewport таблицы.
+            commit_widget = editor
+            while (
+                commit_widget.parentWidget() is not None
+                and commit_widget.parentWidget() != self._view.viewport()
+            ):
+                commit_widget = commit_widget.parentWidget()
+            self._view.commitData(commit_widget)
+            self._view.closeEditor(
+                commit_widget, QAbstractItemDelegate.NoHint
+            )
 
         # Последняя линия обороны: если detail-модель отфильтрована
         # как "fk = N", дозаполнить NULL в этой колонке перед submitAll().
