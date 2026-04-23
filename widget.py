@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QPushButton, QToolBar, QAction, QMessageBox,
     QStyledItemDelegate, QAbstractItemView
 )
-from PyQt5.QtSql import QSqlTableModel
+from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
@@ -38,6 +38,7 @@ class NavigationToolbar(QToolBar):
         super().__init__("Навигация", parent)
         self._view = view
         self._model = model
+        self._server_generated_cols = None  # ленивый кэш IDENTITY/GENERATED колонок
         self._lbl = QLabel(" Запись: 0 / 0 ")
         self._lbl.setStyleSheet(
             "font-weight: bold; padding: 0 8px; color: #2E4057;"
@@ -123,9 +124,48 @@ class NavigationToolbar(QToolBar):
             self._view.selectRow(n - 1)
 
     # --- CRUD ---
+    def _get_server_generated_cols(self) -> set:
+        """Возвращает имена колонок, которые БД вычисляет сама
+        (IDENTITY и GENERATED ALWAYS AS ... STORED). Такие колонки
+        должны исключаться из INSERT, иначе PostgreSQL вернёт ошибку
+        «cannot insert a non-DEFAULT value» / «cannot insert into
+        generated column»."""
+        if self._server_generated_cols is not None:
+            return self._server_generated_cols
+
+        table = self._model.tableName().strip('"')
+        cols = set()
+        q = QSqlQuery()
+        q.prepare(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = :t "
+            "  AND (is_identity = 'YES' OR is_generated = 'ALWAYS')"
+        )
+        q.bindValue(":t", table)
+        if q.exec_():
+            while q.next():
+                cols.add(q.value(0))
+        self._server_generated_cols = cols
+        return cols
+
     def _add(self):
         row = self._model.rowCount()
-        self._model.insertRow(row)
+
+        # Строим пустую запись и помечаем серверно-генерируемые колонки
+        # как «not generated», чтобы они не попадали в INSERT.
+        rec = self._model.record()
+        auto_cols = self._get_server_generated_cols()
+        for i in range(rec.count()):
+            field = rec.field(i)
+            if field.name() in auto_cols or field.isAutoValue():
+                rec.setGenerated(i, False)
+
+        if not self._model.insertRecord(row, rec):
+            error = self._model.lastError().text()
+            QMessageBox.critical(self, "Ошибка добавления", error)
+            self.record_error.emit(error)
+            return
+
         self._view.selectRow(row)
         # Начать редактирование первого редактируемого столбца
         self._view.edit(self._model.index(row, 1))
@@ -158,6 +198,12 @@ class NavigationToolbar(QToolBar):
             self._model.revertAll()
             self.record_error.emit(error_text)
         else:
+            # Перечитать данные из БД, чтобы подтянуть авто-сгенерированные
+            # PK/GENERATED колонки и синхронизировать кэш модели.
+            current_row = self._view.currentIndex().row()
+            self._model.select()
+            if 0 <= current_row < self._model.rowCount():
+                self._view.selectRow(current_row)
             self.record_saved.emit()
 
     def _revert(self):
