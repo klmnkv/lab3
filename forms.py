@@ -317,13 +317,26 @@ class ShopForm(QWidget):
         office_name = master_rec.value("name")
         if office_id in (None, "", 0) or not office_name:
             return
+
+        # Подстраховка: relation-model для FK может быть ещё пустой,
+        # тогда setData(display-value) вернёт False.
+        rel_model = self.detail_model.relationModel(8)
+        if rel_model is not None:
+            rel_model.select()
+
         for row in range(first, last + 1):
             rec = self.detail_model.record(row)
-            if rec.isNull("number_office"):
-                self.detail_model.setData(
-                    self.detail_model.index(row, 8),
-                    office_name, Qt.EditRole
-                )
+            # Для relation-колонки сначала пишем DISPLAY-значение.
+            # На некоторых сборках Qt это может вернуть False, если
+            # relation model ещё не успела подгрузиться — тогда
+            # страхуемся прямой записью FK через setRecord.
+            ok = self.detail_model.setData(
+                self.detail_model.index(row, 8),
+                office_name, Qt.EditRole
+            )
+            if not ok:
+                rec.setValue("number_office", office_id)
+                self.detail_model.setRecord(row, rec)
             if rec.isNull("open"):
                 self.detail_model.setData(
                     self.detail_model.index(row, 6), 1, Qt.EditRole

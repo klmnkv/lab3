@@ -281,14 +281,25 @@ class ShopForm(QWidget):
         office_name = master_rec.value("name")
         if office_id in (None, "", 0) or not office_name:
             return
+
+        # Подстраховка: relation-model для FK может быть ещё пустой,
+        # тогда setData(display-value) вернёт False.
+        rel_model = self.detail_model.relationModel(8)
+        if rel_model is not None:
+            rel_model.select()
+
         for row in range(first, last + 1):
             rec = self.detail_model.record(row)
-            if rec.isNull("number_office"):
-                # Relation column — пишем через setData с именем филиала
-                self.detail_model.setData(
-                    self.detail_model.index(row, 8),
-                    office_name, Qt.EditRole
-                )
+            # Relation column — сначала пишем DISPLAY-значение
+            # (имя филиала), чтобы Qt сам резолвил FK.
+            ok = self.detail_model.setData(
+                self.detail_model.index(row, 8),
+                office_name, Qt.EditRole
+            )
+            # Если relation dictionary ещё не готов — пишем FK напрямую.
+            if not ok:
+                rec.setValue("number_office", office_id)
+                self.detail_model.setRecord(row, rec)
             if rec.isNull("open"):
                 self.detail_model.setData(
                     self.detail_model.index(row, 6), 1, Qt.EditRole
