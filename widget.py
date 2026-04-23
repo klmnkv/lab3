@@ -7,6 +7,7 @@ widget.py — Переиспользуемые виджеты для прило�
   - ReadOnlyDelegate   — делегат для блокировки редактирования отдельных колонок
   - StatusLabel         — метка для отображения статуса подключения
 """
+import re
 
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QTableView, QLabel, QLineEdit,
@@ -227,6 +228,19 @@ class NavigationToolbar(QToolBar):
                 # Предзаполнить DEFAULT-значение, чтобы пользователь его видел
                 # и чтобы INSERT не падал на NOT NULL, если поле не тронуто.
                 rec.setValue(i, defaults[name])
+
+        # Если на модели стоит простой фильтр вида "col = value",
+        # подставляем это значение в новую запись. Это критично для
+        # master-detail сценариев (например, Shop.number_office),
+        # где FK обязателен и должен наследоваться от фильтра detail.
+        filter_expr = (self._model.filter() or "").strip()
+        m = re.fullmatch(r'("?[\w]+"\.?[\w]*|[\w]+)\s*=\s*(\d+)', filter_expr)
+        if m:
+            col_ref, raw_val = m.groups()
+            col_name = col_ref.split(".")[-1].replace('"', "")
+            idx = rec.indexOf(col_name)
+            if idx >= 0 and rec.isNull(idx):
+                rec.setValue(idx, int(raw_val))
 
         if not self._model.insertRecord(row, rec):
             error = self._model.lastError().text()
