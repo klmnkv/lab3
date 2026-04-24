@@ -27,6 +27,7 @@ from PyQt5.QtCore import Qt, QDate, QSortFilterProxyModel
 
 # Импорт переиспользуемых виджетов
 from widget import NavigationToolbar, SearchPanel, ReadOnlyDelegate, StatusLabel
+from widget import MoneyDelegate
 
 
 # ============================================================
@@ -254,6 +255,8 @@ class ShopForm(QWidget):
 
         # Автоподстановка number_office при добавлении новой строки в Shop
         self.detail_model.rowsInserted.connect(self._autofill_office_on_insert)
+        # Надёжная подстановка FK непосредственно в QSqlRecord перед INSERT.
+        self.detail_model.primeInsert.connect(self._prime_shop_insert)
 
         headers_d = {0: "№", 1: "Название", 2: "Нас.пункт", 3: "Улица",
                      4: "Дом", 5: "Телефон", 6: "Открыт", 7: "Дата откр.",
@@ -281,6 +284,7 @@ class ShopForm(QWidget):
         self.navbar = NavigationToolbar(
             self.detail_view, self.detail_model, self
         )
+        self.navbar.row_inserted.connect(self._on_detail_row_inserted)
 
         sep = self.navbar.addSeparator()
         btn_select = QAction("📋 Выбрать филиал...", self)
@@ -317,17 +321,84 @@ class ShopForm(QWidget):
         office_name = master_rec.value("name")
         if office_id in (None, "", 0) or not office_name:
             return
+
+        # Подстраховка: relation-model для FK может быть ещё пустой,
+        # тогда setData(display-value) вернёт False.
+        rel_model = self.detail_model.relationModel(8)
+        if rel_model is not None:
+            rel_model.select()
+
         for row in range(first, last + 1):
             rec = self.detail_model.record(row)
-            if rec.isNull("number_office"):
+            # Для relation-колонки сначала пишем DISPLAY-значение.
+            # На некоторых сборках Qt это может вернуть False, если
+            # relation model ещё не успела подгрузиться — тогда
+            # страхуемся прямой записью FK через setRecord.
+            ok = self.detail_model.setData(
+                self.detail_model.index(row, 8),
+                office_name, Qt.EditRole
+            )
+            if not ok:
+                rec.setValue("number_office", office_id)
+                self.detail_model.setRecord(row, rec)
+            if rec.isNull("openning_date"):
                 self.detail_model.setData(
-                    self.detail_model.index(row, 8),
-                    office_name, Qt.EditRole
+                    self.detail_model.index(row, 7),
+                    QDate.currentDate(),
+                    Qt.EditRole
                 )
-            if rec.isNull("open"):
-                self.detail_model.setData(
-                    self.detail_model.index(row, 6), 1, Qt.EditRole
-                )
+
+    def _prime_shop_insert(self, *args):
+        """Перед фактическим INSERT гарантированно проставить FK филиала.
+
+        В PyQt сигнал primeInsert может приходить как:
+          - primeInsert(QSqlRecord)
+          - primeInsert(int, QSqlRecord)
+        Поэтому извлекаем QSqlRecord из args безопасно.
+        """
+        if not args:
+            return
+        record = args[-1]
+        if not hasattr(record, "indexOf"):
+            return
+        current = self.master_view.currentIndex()
+        if not current.isValid():
+            return
+        office_id = self.master_model.record(current.row()).value("number")
+        if office_id in (None, "", 0):
+            return
+        idx_fk = record.indexOf("number_office")
+        if idx_fk >= 0:
+            record.setValue(idx_fk, office_id)
+        idx_date = record.indexOf("openning_date")
+        if idx_date >= 0 and record.isNull(idx_date):
+            record.setValue(idx_date, QDate.currentDate())
+
+    def _on_detail_row_inserted(self, row: int):
+        """Страховка для вставки через NavigationToolbar.➕"""
+        current = self.master_view.currentIndex()
+        if not current.isValid():
+            return
+        master_rec = self.master_model.record(current.row())
+        office_id = master_rec.value("number")
+        office_name = master_rec.value("name")
+        if office_id in (None, "", 0):
+            return
+        # Для relation-колонки пробуем сначала RAW FK, затем display name.
+        ok = self.detail_model.setData(
+            self.detail_model.index(row, 8), office_id, Qt.EditRole
+        )
+        if not ok and office_name:
+            self.detail_model.setData(
+                self.detail_model.index(row, 8), office_name, Qt.EditRole
+            )
+        rec = self.detail_model.record(row)
+        if rec.isNull("openning_date"):
+            self.detail_model.setData(
+                self.detail_model.index(row, 7),
+                QDate.currentDate(),
+                Qt.EditRole
+            )
 
     def _on_master_changed(self, current, previous):
         """При выборе филиала — фильтровать магазины."""
@@ -477,6 +548,7 @@ class ShopProductForm(QWidget):
         self.sp_view = QTableView()
         self.sp_view.setModel(self.sp_model)
         self.sp_view.setItemDelegate(QSqlRelationalDelegate(self.sp_view))
+        self.sp_view.setItemDelegateForColumn(3, MoneyDelegate(self.sp_view))
         self.sp_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sp_view.setAlternatingRowColors(True)
         self.sp_view.horizontalHeader().setStretchLastSection(True)
@@ -522,12 +594,38 @@ class ShopProductForm(QWidget):
         shop_id = self.shop_model.record(current.row()).value("number")
         if shop_id in (None, "", 0):
             return
+        rel_product = self.sp_model.relationModel(0)
+        product_name = None
+        product_id = None
+        used_products = set()
+        for r in range(self.sp_model.rowCount()):
+            v = self.sp_model.record(r).value("num_product")
+            if v not in (None, "", 0):
+                used_products.add(v)
+        if rel_product is not None:
+            rel_product.select()
+            for r in range(rel_product.rowCount()):
+                prod = rel_product.record(r)
+                pid = prod.value("number")
+                if pid not in used_products:
+                    product_id = pid
+                    product_name = prod.value("name")
+                    break
         for row in range(first, last + 1):
             rec = self.sp_model.record(row)
             if rec.isNull("num_shop"):
                 self.sp_model.setData(
                     self.sp_model.index(row, 1), shop_id, Qt.EditRole
                 )
+            if rec.isNull("num_product"):
+                ok = False
+                if product_name:
+                    ok = self.sp_model.setData(
+                        self.sp_model.index(row, 0), product_name, Qt.EditRole
+                    )
+                if not ok and product_id not in (None, "", 0):
+                    rec.setValue("num_product", product_id)
+                    self.sp_model.setRecord(row, rec)
 
 
 # ============================================================

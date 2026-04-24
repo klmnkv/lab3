@@ -7,11 +7,13 @@ widget.py — Переиспользуемые виджеты для прило�
   - ReadOnlyDelegate   — делегат для блокировки редактирования отдельных колонок
   - StatusLabel         — метка для отображения статуса подключения
 """
+import re
 
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QTableView, QLabel, QLineEdit,
     QComboBox, QPushButton, QToolBar, QAction, QMessageBox,
-    QStyledItemDelegate, QAbstractItemView
+    QStyledItemDelegate, QAbstractItemView, QDoubleSpinBox,
+    QApplication, QAbstractItemDelegate
 )
 from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -228,6 +230,17 @@ class NavigationToolbar(QToolBar):
                 # и чтобы INSERT не падал на NOT NULL, если поле не тронуто.
                 rec.setValue(i, defaults[name])
 
+        # Если на модели стоит простой фильтр вида "col = value",
+        # подставляем это значение в новую запись. Это критично для
+        # master-detail сценариев (например, Shop.number_office),
+        # где FK обязателен и должен наследоваться от фильтра detail.
+        implied = self._extract_simple_filter_value()
+        if implied:
+            col_name, val = implied
+            idx = rec.indexOf(col_name)
+            if idx >= 0 and rec.isNull(idx):
+                rec.setValue(idx, val)
+
         if not self._model.insertRecord(row, rec):
             error = self._model.lastError().text()
             QMessageBox.critical(self, "Ошибка добавления", error)
@@ -263,6 +276,37 @@ class NavigationToolbar(QToolBar):
                 self.record_saved.emit()
 
     def _save(self):
+        # Зафиксировать активный редактор в таблице (если пользователь
+        # нажал «Сохранить», не выходя из ячейки).
+        editor = QApplication.focusWidget()
+        if editor is not None and self._view.isAncestorOf(editor):
+            # Фокус может быть на дочернем QLineEdit внутри редактора
+            # (например, внутри QDoubleSpinBox). Поднимаемся до виджета,
+            # который является прямым ребёнком viewport таблицы.
+            commit_widget = editor
+            while (
+                commit_widget.parentWidget() is not None
+                and commit_widget.parentWidget() != self._view.viewport()
+            ):
+                commit_widget = commit_widget.parentWidget()
+            self._view.commitData(commit_widget)
+            self._view.closeEditor(
+                commit_widget, QAbstractItemDelegate.NoHint
+            )
+
+        # Последняя линия обороны: если detail-модель отфильтрована
+        # как "fk = N", дозаполнить NULL в этой колонке перед submitAll().
+        implied = self._extract_simple_filter_value()
+        if implied:
+            col_name, val = implied
+            col = self._model.record().indexOf(col_name)
+            if col >= 0:
+                for row in range(self._model.rowCount()):
+                    if self._model.record(row).isNull(col_name):
+                        self._model.setData(
+                            self._model.index(row, col), val, Qt.EditRole
+                        )
+
         if not self._model.submitAll():
             error_text = self._model.lastError().text()
             QMessageBox.critical(self, "Ошибка сохранения", error_text)
@@ -276,6 +320,16 @@ class NavigationToolbar(QToolBar):
             if 0 <= current_row < self._model.rowCount():
                 self._view.selectRow(current_row)
             self.record_saved.emit()
+
+    def _extract_simple_filter_value(self):
+        """Вернуть (column_name, int_value) для фильтра вида `col = 123`."""
+        filter_expr = (self._model.filter() or "").strip()
+        m = re.fullmatch(r'("?[\w]+"\.?[\w]*|[\w]+)\s*=\s*(\d+)', filter_expr)
+        if not m:
+            return None
+        col_ref, raw_val = m.groups()
+        col_name = col_ref.split(".")[-1].replace('"', "")
+        return col_name, int(raw_val)
 
     def _revert(self):
         self._model.revertAll()
@@ -383,6 +437,35 @@ class ReadOnlyDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         return None  # Не создаём редактор → колонка read-only
+
+
+class MoneyDelegate(QStyledItemDelegate):
+    """Делегат редактирования MONEY через float-редактор."""
+
+    def createEditor(self, parent, option, index):
+        editor = QDoubleSpinBox(parent)
+        editor.setDecimals(2)
+        editor.setMinimum(0.0)
+        editor.setMaximum(1_000_000_000.0)
+        editor.setSingleStep(1.0)
+        return editor
+
+    def setEditorData(self, editor, index):
+        txt = str(index.model().data(index, Qt.EditRole) or "")
+        cleaned = "".join(ch for ch in txt if ch.isdigit() or ch in ",.-")
+        cleaned = cleaned.replace(",", ".")
+        try:
+            value = float(cleaned) if cleaned not in ("", "-", ".", "-.") else 0.0
+        except ValueError:
+            value = 0.0
+        editor.setValue(value)
+
+    def setModelData(self, editor, model, index):
+        # Для MONEY в ru_RU PostgreSQL ожидает десятичную запятую.
+        # Передаём строку в локальном формате, чтобы исключить 22P02
+        # на значениях вида "100.00".
+        money_text = f"{editor.value():.2f}".replace(".", ",")
+        model.setData(index, money_text, Qt.EditRole)
 
 
 # ============================================================
