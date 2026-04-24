@@ -439,6 +439,33 @@ class ReadOnlyDelegate(QStyledItemDelegate):
         return None  # Не создаём редактор → колонка read-only
 
 
+_MONEY_DECIMAL_SEP = None
+
+
+def _money_decimal_sep() -> str:
+    """Возвращает десятичный разделитель, который ожидает/выдаёт
+    PostgreSQL для типа MONEY в текущей сессии.
+
+    Парсинг MONEY в PG зависит от lc_monetary: в ru_RU нужен `,`,
+    в C/en_US — `.`. Жёстко захардкоденный разделитель приводит к
+    тому, что либо строка отбрасывается с 22P02 invalid input
+    syntax for type money, либо (что хуже) парсится как
+    thousands-separator и молча искажает значение.
+
+    Определяем разделитель один раз: кастуем numeric → money (numeric
+    всегда парсится с точкой) и смотрим, какой символ PG вывел."""
+    global _MONEY_DECIMAL_SEP
+    if _MONEY_DECIMAL_SEP is not None:
+        return _MONEY_DECIMAL_SEP
+    q = QSqlQuery()
+    if q.exec_("SELECT (1.5::numeric)::money::text") and q.next():
+        txt = str(q.value(0) or "")
+        _MONEY_DECIMAL_SEP = "," if "," in txt else "."
+    else:
+        _MONEY_DECIMAL_SEP = "."
+    return _MONEY_DECIMAL_SEP
+
+
 class MoneyDelegate(QStyledItemDelegate):
     """Делегат редактирования MONEY через float-редактор."""
 
@@ -448,6 +475,13 @@ class MoneyDelegate(QStyledItemDelegate):
         editor.setMinimum(0.0)
         editor.setMaximum(1_000_000_000.0)
         editor.setSingleStep(1.0)
+        # Коммитим при завершении редактирования (Enter / потеря фокуса).
+        # Без этого значение спинбокса может не попасть в модель, если
+        # пользователь кликнул на кнопку тулбара (QToolButton имеет
+        # Qt.NoFocus и не «уводит» фокус с внутреннего QLineEdit).
+        editor.editingFinished.connect(
+            lambda e=editor: self.commitData.emit(e)
+        )
         return editor
 
     def setEditorData(self, editor, index):
@@ -461,11 +495,63 @@ class MoneyDelegate(QStyledItemDelegate):
         editor.setValue(value)
 
     def setModelData(self, editor, model, index):
-        # Для MONEY в ru_RU PostgreSQL ожидает десятичную запятую.
-        # Передаём строку в локальном формате, чтобы исключить 22P02
-        # на значениях вида "100.00".
-        money_text = f"{editor.value():.2f}".replace(".", ",")
+        # PostgreSQL MONEY.cash_in читает десятичный разделитель из
+        # lc_monetary. Формат должен совпадать с настройками сервера,
+        # иначе PG вернёт 22P02 или, что опаснее, воспримет `.` / `,`
+        # как разделитель тысяч и запишет искажённое значение.
+        money_text = f"{editor.value():.2f}"
+        sep = _money_decimal_sep()
+        if sep != ".":
+            money_text = money_text.replace(".", sep)
         model.setData(index, money_text, Qt.EditRole)
+
+
+# ============================================================
+#  LookupComboDelegate — ComboBox-подстановка id → отображаемое имя
+# ============================================================
+class LookupComboDelegate(QStyledItemDelegate):
+    """Делегат для FK-колонок: хранит int-id в модели, а показывает и
+    редактирует название из справочника.
+
+    Нужен, чтобы работать с таблицами, где FK входит в составной PK:
+    QSqlRelationalTableModel в таких случаях ломает WHERE-клаузу для
+    UPDATE/DELETE (подменяет имя колонки alias'ом JOIN). Плоский
+    QSqlTableModel с этим делегатом лишён такой проблемы."""
+
+    def __init__(self, items, parent=None):
+        """items: список [(id, name), ...]."""
+        super().__init__(parent)
+        self._items = list(items)
+        self._id_to_name = {i: n for i, n in self._items}
+
+    def displayText(self, value, locale):
+        try:
+            return self._id_to_name.get(int(value), str(value))
+        except (TypeError, ValueError):
+            return str(value) if value is not None else ""
+
+    def createEditor(self, parent, option, index):
+        editor = QComboBox(parent)
+        for item_id, name in self._items:
+            editor.addItem(name, item_id)
+        editor.currentIndexChanged.connect(
+            lambda _i, e=editor: self.commitData.emit(e)
+        )
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        try:
+            pos = editor.findData(int(value))
+        except (TypeError, ValueError):
+            pos = -1
+        if pos >= 0:
+            editor.setCurrentIndex(pos)
+
+    def setModelData(self, editor, model, index):
+        item_id = editor.currentData()
+        if item_id is not None:
+            model.setData(index, int(item_id), Qt.EditRole)
 
 
 # ============================================================

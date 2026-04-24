@@ -17,11 +17,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtSql import (
     QSqlTableModel, QSqlRelationalTableModel, QSqlRelation,
-    QSqlRelationalDelegate
+    QSqlRelationalDelegate, QSqlQuery
 )
 from PyQt5.QtCore import Qt, QDate
 
-from widget import NavigationToolbar, ReadOnlyDelegate, MoneyDelegate
+from widget import (
+    NavigationToolbar, ReadOnlyDelegate, MoneyDelegate, LookupComboDelegate
+)
 
 # Путь к папке с .ui файлами
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
@@ -475,13 +477,17 @@ class ShopProductForm(QWidget):
             self._on_shop_changed
         )
 
-        # --- Detail: Shop_Product с Lookup ---
-        self.sp_model = QSqlRelationalTableModel()
+        # --- Detail: Shop_Product (плоская модель) ---
+        # QSqlRelationalTableModel не годится: num_product входит в
+        # составной PK, и при setRelation(0, ...) Qt ломает WHERE-клаузу
+        # для UPDATE/DELETE (алиас JOIN подставляется вместо имени
+        # колонки). Симптомы — цена не сохраняется, строки не удаляются,
+        # ошибок при этом может не быть (UPDATE обновляет 0 строк).
+        # Поэтому берём QSqlTableModel и делаем подстановку имени товара
+        # кастомным LookupComboDelegate'ом.
+        self.sp_model = QSqlTableModel()
         self.sp_model.setTable('"Shop_Product"')
         self.sp_model.setEditStrategy(QSqlTableModel.OnManualSubmit)
-        self.sp_model.setRelation(
-            0, QSqlRelation('"Product"', 'number', 'name')
-        )
         self.sp_model.select()
 
         # Автоподстановка num_shop при добавлении новой строки в Shop_Product
@@ -492,8 +498,13 @@ class ShopProductForm(QWidget):
         for c, n in sp_headers.items():
             self.sp_model.setHeaderData(c, Qt.Horizontal, n)
 
+        self._products = self._load_products()
+        self._product_name_to_id = {n: i for i, n in self._products}
+
         self.spView.setModel(self.sp_model)
-        self.spView.setItemDelegate(QSqlRelationalDelegate(self.spView))
+        self.spView.setItemDelegateForColumn(
+            0, LookupComboDelegate(self._products, self.spView)
+        )
         self.spView.setItemDelegateForColumn(3, MoneyDelegate(self.spView))
         self.spView.horizontalHeader().setStretchLastSection(True)
 
@@ -507,49 +518,48 @@ class ShopProductForm(QWidget):
         if self.shop_model.rowCount() > 0:
             self.shopView.selectRow(0)
 
+    def _load_products(self):
+        """Загрузить справочник продуктов [(id, name), ...] один раз."""
+        items = []
+        q = QSqlQuery()
+        if q.exec_('SELECT number, name FROM "Product" ORDER BY number'):
+            while q.next():
+                items.append((int(q.value(0)), str(q.value(1))))
+        return items
+
     def _autofill_shop_on_insert(self, parent, first, last):
         """При добавлении новой строки в Shop_Product автоматически
-        подставить num_shop из выбранного магазина (master).
-        num_shop — обычный INTEGER FK (не relation), setData принимает
-        сырое число."""
+        подставить num_shop из выбранного магазина и свободный
+        num_product из справочника. Модель — плоский QSqlTableModel,
+        поэтому пишем сырые int id в обе колонки."""
         current = self.shopView.currentIndex()
         if not current.isValid():
             return
         shop_id = self.shop_model.record(current.row()).value("number")
         if shop_id in (None, "", 0):
             return
-        rel_product = self.sp_model.relationModel(0)
-        product_name = None
-        product_id = None
         used_products = set()
         for r in range(self.sp_model.rowCount()):
             v = self.sp_model.record(r).value("num_product")
             if v not in (None, "", 0):
                 used_products.add(v)
-        if rel_product is not None:
-            rel_product.select()
-            for r in range(rel_product.rowCount()):
-                prod = rel_product.record(r)
-                pid = prod.value("number")
-                if pid not in used_products:
-                    product_id = pid
-                    product_name = prod.value("name")
-                    break
+        free_product_id = None
+        for pid, _name in self._products:
+            if pid not in used_products:
+                free_product_id = pid
+                break
         for row in range(first, last + 1):
             rec = self.sp_model.record(row)
             if rec.isNull("num_shop"):
                 self.sp_model.setData(
-                    self.sp_model.index(row, 1), shop_id, Qt.EditRole
+                    self.sp_model.index(row, 1), int(shop_id), Qt.EditRole
                 )
-            if rec.isNull("num_product"):
-                ok = False
-                if product_name:
-                    ok = self.sp_model.setData(
-                        self.sp_model.index(row, 0), product_name, Qt.EditRole
-                    )
-                if not ok and product_id not in (None, "", 0):
-                    rec.setValue("num_product", product_id)
-                    self.sp_model.setRecord(row, rec)
+            if rec.isNull("num_product") and free_product_id is not None:
+                self.sp_model.setData(
+                    self.sp_model.index(row, 0),
+                    int(free_product_id),
+                    Qt.EditRole,
+                )
 
     def _on_shop_changed(self, current, previous):
         if not current.isValid():
