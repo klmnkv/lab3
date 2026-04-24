@@ -475,6 +475,13 @@ class MoneyDelegate(QStyledItemDelegate):
         editor.setMinimum(0.0)
         editor.setMaximum(1_000_000_000.0)
         editor.setSingleStep(1.0)
+        # Коммитим при завершении редактирования (Enter / потеря фокуса).
+        # Без этого значение спинбокса может не попасть в модель, если
+        # пользователь кликнул на кнопку тулбара (QToolButton имеет
+        # Qt.NoFocus и не «уводит» фокус с внутреннего QLineEdit).
+        editor.editingFinished.connect(
+            lambda e=editor: self.commitData.emit(e)
+        )
         return editor
 
     def setEditorData(self, editor, index):
@@ -497,6 +504,54 @@ class MoneyDelegate(QStyledItemDelegate):
         if sep != ".":
             money_text = money_text.replace(".", sep)
         model.setData(index, money_text, Qt.EditRole)
+
+
+# ============================================================
+#  LookupComboDelegate — ComboBox-подстановка id → отображаемое имя
+# ============================================================
+class LookupComboDelegate(QStyledItemDelegate):
+    """Делегат для FK-колонок: хранит int-id в модели, а показывает и
+    редактирует название из справочника.
+
+    Нужен, чтобы работать с таблицами, где FK входит в составной PK:
+    QSqlRelationalTableModel в таких случаях ломает WHERE-клаузу для
+    UPDATE/DELETE (подменяет имя колонки alias'ом JOIN). Плоский
+    QSqlTableModel с этим делегатом лишён такой проблемы."""
+
+    def __init__(self, items, parent=None):
+        """items: список [(id, name), ...]."""
+        super().__init__(parent)
+        self._items = list(items)
+        self._id_to_name = {i: n for i, n in self._items}
+
+    def displayText(self, value, locale):
+        try:
+            return self._id_to_name.get(int(value), str(value))
+        except (TypeError, ValueError):
+            return str(value) if value is not None else ""
+
+    def createEditor(self, parent, option, index):
+        editor = QComboBox(parent)
+        for item_id, name in self._items:
+            editor.addItem(name, item_id)
+        editor.currentIndexChanged.connect(
+            lambda _i, e=editor: self.commitData.emit(e)
+        )
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        try:
+            pos = editor.findData(int(value))
+        except (TypeError, ValueError):
+            pos = -1
+        if pos >= 0:
+            editor.setCurrentIndex(pos)
+
+    def setModelData(self, editor, model, index):
+        item_id = editor.currentData()
+        if item_id is not None:
+            model.setData(index, int(item_id), Qt.EditRole)
 
 
 # ============================================================
