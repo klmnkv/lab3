@@ -439,6 +439,33 @@ class ReadOnlyDelegate(QStyledItemDelegate):
         return None  # Не создаём редактор → колонка read-only
 
 
+_MONEY_DECIMAL_SEP = None
+
+
+def _money_decimal_sep() -> str:
+    """Возвращает десятичный разделитель, который ожидает/выдаёт
+    PostgreSQL для типа MONEY в текущей сессии.
+
+    Парсинг MONEY в PG зависит от lc_monetary: в ru_RU нужен `,`,
+    в C/en_US — `.`. Жёстко захардкоденный разделитель приводит к
+    тому, что либо строка отбрасывается с 22P02 invalid input
+    syntax for type money, либо (что хуже) парсится как
+    thousands-separator и молча искажает значение.
+
+    Определяем разделитель один раз: кастуем numeric → money (numeric
+    всегда парсится с точкой) и смотрим, какой символ PG вывел."""
+    global _MONEY_DECIMAL_SEP
+    if _MONEY_DECIMAL_SEP is not None:
+        return _MONEY_DECIMAL_SEP
+    q = QSqlQuery()
+    if q.exec_("SELECT (1.5::numeric)::money::text") and q.next():
+        txt = str(q.value(0) or "")
+        _MONEY_DECIMAL_SEP = "," if "," in txt else "."
+    else:
+        _MONEY_DECIMAL_SEP = "."
+    return _MONEY_DECIMAL_SEP
+
+
 class MoneyDelegate(QStyledItemDelegate):
     """Делегат редактирования MONEY через float-редактор."""
 
@@ -461,10 +488,14 @@ class MoneyDelegate(QStyledItemDelegate):
         editor.setValue(value)
 
     def setModelData(self, editor, model, index):
-        # Для MONEY в ru_RU PostgreSQL ожидает десятичную запятую.
-        # Передаём строку в локальном формате, чтобы исключить 22P02
-        # на значениях вида "100.00".
-        money_text = f"{editor.value():.2f}".replace(".", ",")
+        # PostgreSQL MONEY.cash_in читает десятичный разделитель из
+        # lc_monetary. Формат должен совпадать с настройками сервера,
+        # иначе PG вернёт 22P02 или, что опаснее, воспримет `.` / `,`
+        # как разделитель тысяч и запишет искажённое значение.
+        money_text = f"{editor.value():.2f}"
+        sep = _money_decimal_sep()
+        if sep != ".":
+            money_text = money_text.replace(".", sep)
         model.setData(index, money_text, Qt.EditRole)
 
 
