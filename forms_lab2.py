@@ -444,8 +444,11 @@ class ProductDetailsForm(QWidget):
         )
 
         # Автозаполнение значений по умолчанию для NOT NULL полей
-        # при добавлении новой строки (category, units).
-        self.model.primeInsert.connect(self._prime_product_insert)
+        # при добавлении новой строки (category, units). Используем
+        # rowsInserted + setData (надёжнее, чем primeInsert+setValue
+        # в PyQt5 — последний не всегда переносит правки обратно
+        # в модель).
+        self.model.rowsInserted.connect(self._autofill_product_defaults)
 
         # Перейти к первой записи
         if self.model.rowCount() > 0:
@@ -485,14 +488,28 @@ class ProductDetailsForm(QWidget):
             self.model.index(row, 2), item.text(), Qt.EditRole
         )
 
-    def _prime_product_insert(self, row, record):
-        """Подставить значения по умолчанию для NOT NULL полей при
-        добавлении новой строки в Product. Без этого PostgreSQL отдаёт
-        23502 (null value in NOT NULL column 'units')."""
-        if not record.value("category"):
-            record.setValue("category", "другое")
-        if not record.value("units"):
-            record.setValue("units", "шт")
+    def _autofill_product_defaults(self, parent, first, last):
+        """Подставить значения по умолчанию для NOT NULL полей Product
+        при добавлении новой строки. Без этого PostgreSQL отдаёт 23502
+        (null value in NOT NULL column 'units').
+
+        Также синхронизируем виджеты Details (combo/list/lineEdit),
+        иначе после refresh они визуально пусты, а под ними в модели
+        уже подставлены дефолты."""
+        for row in range(first, last + 1):
+            rec = self.model.record(row)
+            if rec.isNull("category") or not rec.value("category"):
+                self.model.setData(
+                    self.model.index(row, 1), "другое", Qt.EditRole
+                )
+            if rec.isNull("units") or not rec.value("units"):
+                self.model.setData(
+                    self.model.index(row, 2), "шт", Qt.EditRole
+                )
+        # Перевести таблицу/маппер на свежедобавленную строку,
+        # чтобы дефолты сразу отобразились в combo/list/lineEdit.
+        self.tableView.selectRow(last)
+        self.mapper.setCurrentIndex(last)
 
     def _refresh_after_save(self):
         row = self.tableView.currentIndex().row()
