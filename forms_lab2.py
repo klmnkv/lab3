@@ -146,6 +146,10 @@ class BranchOfficeDetailsForm(QWidget):
         self.mapper = QDataWidgetMapper(self)
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
+        # Перед submitAll — принудительно зафиксировать активный
+        # QLineEdit в маппере, иначе при «Сохранить» без потери фокуса
+        # AutoSubmit не срабатывает и правка не доедет до БД.
+        self.navbar.about_to_save.connect(self.mapper.submit)
 
         self.mapper.addMapping(self.editNumber,    0)  # number      (read-only)
         # Скрыть PK у родительской таблицы Branch_office
@@ -422,6 +426,10 @@ class ProductDetailsForm(QWidget):
         self.mapper = QDataWidgetMapper(self)
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
+        # Перед submitAll — принудительно сбросить editName/comboCategory
+        # в модель: AutoSubmit не реагирует, если пользователь нажал
+        # «Сохранить», не уведя фокус с поля.
+        self.navbar.about_to_save.connect(self.mapper.submit)
 
         # Делегат для ComboBox (category): связывает с моделью по тексту
         self._combo_delegate = ComboTextDelegate(self)
