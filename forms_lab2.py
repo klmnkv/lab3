@@ -146,16 +146,10 @@ class BranchOfficeDetailsForm(QWidget):
         self.mapper = QDataWidgetMapper(self)
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
-        # Перед submitAll — принудительно зафиксировать активный
-        # QLineEdit в маппере, иначе при «Сохранить» без потери фокуса
-        # AutoSubmit не срабатывает и правка не доедет до БД.
-        self.navbar.about_to_save.connect(self.mapper.submit)
 
-        # Колонка number (PK, IDENTITY ALWAYS) у родительской таблицы
-        # Branch_office не отображается и не редактируется — ни мапить
-        # её на editNumber, ни показывать поле не нужно. Иначе при
-        # mapper.submit() в модель уйдёт пустая строка, generated-флаг
-        # колонки сбросится, и PostgreSQL вернёт 428C9.
+        self.mapper.addMapping(self.editNumber,    0)  # number      (read-only)
+        # Скрыть PK — только визуально, mapping остаётся, чтобы
+        # значение правильно отображалось при навигации.
         self.editNumber.hide()
         self.lblNumber.hide()
         self.mapper.addMapping(self.editName,      1)  # name
@@ -429,16 +423,12 @@ class ProductDetailsForm(QWidget):
         self.mapper = QDataWidgetMapper(self)
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
-        # Перед submitAll — принудительно сбросить editName/comboCategory
-        # в модель: AutoSubmit не реагирует, если пользователь нажал
-        # «Сохранить», не уведя фокус с поля.
-        self.navbar.about_to_save.connect(self.mapper.submit)
 
         # Делегат для ComboBox (category): связывает с моделью по тексту
         self._combo_delegate = ComboTextDelegate(self)
 
-        # PK у Product тоже не мапим: поле скрыто, mapper.submit() не
-        # должен писать пустой "number" обратно в модель.
+        self.mapper.addMapping(self.editNumber, 0)  # number — read-only
+        # Скрыть PK — только визуально, mapping остаётся.
         self.editNumber.hide()
         self.lblNumber.hide()
         self.mapper.addMapping(self.comboCategory, 1)  # category (CHECK-список)
