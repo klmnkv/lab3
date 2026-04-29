@@ -443,6 +443,10 @@ class ProductDetailsForm(QWidget):
             self._on_row_changed
         )
 
+        # Автозаполнение значений по умолчанию для NOT NULL полей
+        # при добавлении новой строки (category, units).
+        self.model.primeInsert.connect(self._prime_product_insert)
+
         # Перейти к первой записи
         if self.model.rowCount() > 0:
             self.tableView.selectRow(0)
@@ -480,6 +484,15 @@ class ProductDetailsForm(QWidget):
         self.model.setData(
             self.model.index(row, 2), item.text(), Qt.EditRole
         )
+
+    def _prime_product_insert(self, row, record):
+        """Подставить значения по умолчанию для NOT NULL полей при
+        добавлении новой строки в Product. Без этого PostgreSQL отдаёт
+        23502 (null value in NOT NULL column 'units')."""
+        if not record.value("category"):
+            record.setValue("category", "другое")
+        if not record.value("units"):
+            record.setValue("units", "шт")
 
     def _refresh_after_save(self):
         row = self.tableView.currentIndex().row()

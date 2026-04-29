@@ -155,10 +155,20 @@ class ProductForm(QWidget):
         self.tableView.setColumnHidden(0, True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
 
+        # Подставить дефолты для NOT NULL колонок (category, units)
+        # при добавлении новой строки.
+        self.model.primeInsert.connect(self._prime_product_insert)
+
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
         self.layout().insertWidget(0, self.navbar)
 
         _connect_search(self, self.model, PRODUCT_SEARCH_COLS)
+
+    def _prime_product_insert(self, row, record):
+        if not record.value("category"):
+            record.setValue("category", "другое")
+        if not record.value("units"):
+            record.setValue("units", "шт")
 
 
 # ============================================================
