@@ -21,13 +21,13 @@ class LoginDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Авторизация — educationDB")
+        self.setWindowTitle("Авторизация")
         self.setModal(True)
         self.setMinimumWidth(340)
 
         title = QLabel(
             "<h3>Вход в программу</h3>"
-            "<p>Введите логин и пароль учётной записи PostgreSQL.</p>"
+            "<p>Введите логин и пароль.</p>"
         )
         title.setTextFormat(Qt.RichText)
 
@@ -79,7 +79,7 @@ class LoginDialog(QDialog):
         if user != DB_USER or password != DB_PASSWORD:
             QMessageBox.critical(
                 self, "Ошибка авторизации",
-                "Неверный логин или пароль учётной записи PostgreSQL."
+                "Неверный логин или пароль."
             )
             self.pass_edit.selectAll()
             self.pass_edit.setFocus()
