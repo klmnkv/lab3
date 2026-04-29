@@ -30,6 +30,9 @@
       <item>
        <widget class="QComboBox" name="comboColumn">
         <item>
+         <property name="text"><string>Категория</string></property>
+        </item>
+        <item>
          <property name="text"><string>Название</string></property>
         </item>
         <item>
@@ -98,15 +101,15 @@
          </widget>
         </item>
 
-        <!-- Название — ComboBox, т.к. поле ограничено CHECK-условием
-             ('сахар','мука','масло','молоко','хлеб') -->
+        <!-- Категория — ComboBox, поле ограничено CHECK-условием
+             ('сахар','мука','масло','молоко','хлеб','другое') -->
         <item row="1" column="0">
-         <widget class="QLabel" name="lblName">
-          <property name="text"><string>Название:</string></property>
+         <widget class="QLabel" name="lblCategory">
+          <property name="text"><string>Категория:</string></property>
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QComboBox" name="comboName">
+         <widget class="QComboBox" name="comboCategory">
           <property name="toolTip">
            <string>Допустимые значения ограничены CHECK-условием в БД</string>
           </property>
@@ -115,10 +118,11 @@
           <item><property name="text"><string>масло</string></property></item>
           <item><property name="text"><string>молоко</string></property></item>
           <item><property name="text"><string>хлеб</string></property></item>
+          <item><property name="text"><string>другое</string></property></item>
          </widget>
         </item>
 
-        <!-- Единицы — ListBox (поле ограничено CHECK-условием в БД) -->
+        <!-- Единицы — ListBox (поле — ENUM public.unit) -->
         <item row="2" column="0">
          <widget class="QLabel" name="lblUnits">
           <property name="text"><string>Единицы:</string></property>
@@ -137,6 +141,21 @@
           <item><property name="text"><string>шт</string></property></item>
          </widget>
         </item>
+
+        <!-- Название — произвольный текст (опционально) -->
+        <item row="3" column="0">
+         <widget class="QLabel" name="lblName">
+          <property name="text"><string>Название:</string></property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QLineEdit" name="editName">
+          <property name="placeholderText">
+           <string>Например, «Сахар-песок Краснодар»</string>
+          </property>
+          <property name="clearButtonEnabled"><bool>true</bool></property>
+         </widget>
+        </item>
        </layout>
       </item>
      </layout>
@@ -146,7 +165,7 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>ℹ️ Допустимые названия: сахар, мука, масло, молоко, хлеб. Допустимые единицы: кг, л, шт.</string>
+      <string>ℹ️ Категории: сахар, мука, масло, молоко, хлеб, другое. Единицы: кг, л, шт. «Название» — произвольный текст.</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
      <property name="styleSheet">

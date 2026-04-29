@@ -37,6 +37,8 @@ class NavigationToolbar(QToolBar):
     record_error = pyqtSignal(str)
     row_inserted = pyqtSignal(int)  # номер свежедобавленной строки —
                                     # форма может подставить дефолты (FK и т.п.)
+    about_to_save = pyqtSignal()    # перед submitAll — форма может
+                                    # сбросить состояние QDataWidgetMapper'а
 
     def __init__(self, view: QTableView, model: QSqlTableModel, parent=None):
         super().__init__("Навигация", parent)
@@ -276,6 +278,12 @@ class NavigationToolbar(QToolBar):
                 self.record_saved.emit()
 
     def _save(self):
+        # Дать форме шанс сбросить промежуточное состояние редакторов,
+        # которые не входят в QTableView (например, QDataWidgetMapper
+        # с QLineEdit'ами в Details-форме — без явного submit правки
+        # из ещё активного поля не попадут в модель).
+        self.about_to_save.emit()
+
         # Зафиксировать активный редактор в таблице (если пользователь
         # нажал «Сохранить», не выходя из ячейки).
         editor = QApplication.focusWidget()
