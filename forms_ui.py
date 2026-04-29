@@ -155,29 +155,10 @@ class ProductForm(QWidget):
         self.tableView.setColumnHidden(0, True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
 
-        # Подставить дефолты для NOT NULL колонок (category, units)
-        # при добавлении новой строки.
-        self.model.rowsInserted.connect(self._autofill_product_defaults)
-
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
         self.layout().insertWidget(0, self.navbar)
 
         _connect_search(self, self.model, PRODUCT_SEARCH_COLS)
-
-    def _autofill_product_defaults(self, parent, first, last):
-        """Заполнить NOT NULL поля Product значениями по умолчанию,
-        чтобы пользователь мог сохранить новую запись, не заполняя их
-        вручную (units — ENUM NOT NULL, category — TEXT NOT NULL)."""
-        for row in range(first, last + 1):
-            rec = self.model.record(row)
-            if rec.isNull("category") or not rec.value("category"):
-                self.model.setData(
-                    self.model.index(row, 1), "другое", Qt.EditRole
-                )
-            if rec.isNull("units") or not rec.value("units"):
-                self.model.setData(
-                    self.model.index(row, 2), "шт", Qt.EditRole
-                )
 
 
 # ============================================================
