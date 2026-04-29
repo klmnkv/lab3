@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtSql import QSqlDatabase
 from PyQt5.QtCore import Qt
 
+from db_config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 from forms import (
     BranchOfficeForm, ShopForm, ProductForm,
     ShopProductForm, ShopFullInfoForm
@@ -28,31 +29,32 @@ from forms import (
 from login_dialog import LoginDialog
 
 
-def connect_db() -> bool:
-    """Авторизация через PostgreSQL: учётные данные вводит пользователь.
-
-    Показываем диалог логина — он сам проверяет креды, открывая пробное
-    соединение. Если диалог принят, открываем основное соединение
-    приложения с теми же параметрами.
-    """
+def authorize() -> bool:
+    """Окно авторизации: сверяет введённые логин/пароль с учётной записью
+    PostgreSQL из db_config.py."""
     dialog = LoginDialog()
-    if dialog.exec_() != LoginDialog.Accepted:
-        return False
+    return dialog.exec_() == LoginDialog.Accepted
 
-    creds = dialog.credentials
+
+def connect_db() -> bool:
+    """Подключение к PostgreSQL через QPSQL-драйвер."""
     db = QSqlDatabase.addDatabase("QPSQL")
-    db.setHostName(creds["host"])
-    db.setPort(creds["port"])
-    db.setDatabaseName(creds["db_name"])
-    db.setUserName(creds["username"])
-    db.setPassword(creds["password"])
+    db.setHostName(DB_HOST)
+    db.setPort(DB_PORT)
+    db.setDatabaseName(DB_NAME)
+    db.setUserName(DB_USER)
+    db.setPassword(DB_PASSWORD)
 
     if not db.open():
         QMessageBox.critical(
             None,
             "Ошибка подключения к БД",
-            "Не удалось открыть основное соединение после авторизации.\n\n"
-            f"Ошибка: {db.lastError().text()}"
+            f"Не удалось подключиться к {DB_NAME}@{DB_HOST}:{DB_PORT}\n\n"
+            f"Ошибка: {db.lastError().text()}\n\n"
+            f"Проверьте:\n"
+            f"  1) PostgreSQL запущен (sudo systemctl status postgresql)\n"
+            f"  2) БД '{DB_NAME}' существует (psql -U postgres -f setup_db.sql)\n"
+            f"  3) Логин/пароль в db_config.py"
         )
         return False
     return True
@@ -270,6 +272,10 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    # Авторизация по учётной записи PostgreSQL из db_config.py
+    if not authorize():
+        sys.exit(0)
 
     # Подключение к БД
     if not connect_db():
