@@ -148,6 +148,9 @@ class BranchOfficeDetailsForm(QWidget):
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
 
         self.mapper.addMapping(self.editNumber,    0)  # number      (read-only)
+        # Скрыть PK у родительской таблицы Branch_office
+        self.editNumber.hide()
+        self.lblNumber.hide()
         self.mapper.addMapping(self.editName,      1)  # name
         self.mapper.addMapping(self.editRegion,    2)  # region
         self.mapper.addMapping(self.editLocality,  3)  # locality
@@ -424,6 +427,9 @@ class ProductDetailsForm(QWidget):
         self._combo_delegate = ComboTextDelegate(self)
 
         self.mapper.addMapping(self.editNumber, 0)  # number — read-only
+        # Скрыть PK у родительской таблицы Product
+        self.editNumber.hide()
+        self.lblNumber.hide()
         self.mapper.addMapping(self.comboCategory, 1)  # category (CHECK-список)
         self.mapper.addMapping(self.editName, 3)       # name (свободный текст)
         # Для units используется ListWidget. QDataWidgetMapper не

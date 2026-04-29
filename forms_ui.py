@@ -109,6 +109,8 @@ class BranchOfficeForm(QWidget):
             self.model.setHeaderData(col, Qt.Horizontal, name)
 
         self.tableView.setModel(self.model)
+        # Скрыть PK (number) — внутреннее поле БД, пользователю не показываем
+        self.tableView.setColumnHidden(0, True)
         self.tableView.setColumnHidden(8, True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
 
@@ -149,6 +151,8 @@ class ProductForm(QWidget):
         self.model.setHeaderData(3, Qt.Horizontal, "Название")
 
         self.tableView.setModel(self.model)
+        # Скрыть PK (number) — родительская таблица, PK служебный
+        self.tableView.setColumnHidden(0, True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
 
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
@@ -172,6 +176,8 @@ class BranchSelectDialog(QDialog):
         self.model.select()
 
         self.tableView.setModel(self.model)
+        # Скрыть PK (number) и фото
+        self.tableView.setColumnHidden(0, True)
         self.tableView.setColumnHidden(8, True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
 
@@ -217,6 +223,8 @@ class ShopForm(QWidget):
             self.master_model.setHeaderData(c, Qt.Horizontal, n)
 
         self.masterView.setModel(self.master_model)
+        # Скрыть PK и фото у Branch_office (master — родительская таблица)
+        self.masterView.setColumnHidden(0, True)
         self.masterView.setColumnHidden(8, True)
         self.masterView.horizontalHeader().setStretchLastSection(True)
         self.masterView.selectionModel().currentRowChanged.connect(
