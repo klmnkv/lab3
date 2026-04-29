@@ -1,10 +1,12 @@
 """
-db_config.py — Настройки подключения к БД educationDB.
-Измените параметры под свою систему.
+db_config.py — Параметры подключения к БД educationDB.
+
+Логин и пароль PostgreSQL пользователь вводит при запуске программы
+(см. login_dialog.py). Здесь задаются только сетевые параметры и имя БД,
+а DB_USER используется только как значение по умолчанию в диалоге логина.
 """
 
 DB_HOST = "localhost"
 DB_PORT = 5432
 DB_NAME = "educationDB"
-DB_USER = "postgres"
-DB_PASSWORD = "postgres"  # <-- ваш пароль
+DB_USER = "postgres"  # значение по умолчанию для поля «Логин» в окне входа
