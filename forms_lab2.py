@@ -372,6 +372,7 @@ class ProductDetailsForm(QWidget):
     _instance = None
 
     SEARCH_COLS = {
+        "Категория": "category",
         "Название": "name",
         "Ед. изм.": "units",
     }
@@ -395,8 +396,9 @@ class ProductDetailsForm(QWidget):
         self.model.select()
 
         self.model.setHeaderData(0, Qt.Horizontal, "№")
-        self.model.setHeaderData(1, Qt.Horizontal, "Название")
+        self.model.setHeaderData(1, Qt.Horizontal, "Категория")
         self.model.setHeaderData(2, Qt.Horizontal, "Ед. изм.")
+        self.model.setHeaderData(3, Qt.Horizontal, "Название")
 
         # Скрытый QTableView — нужен NavigationToolbar'у для управления
         # текущей строкой и синхронизации с QDataWidgetMapper.
@@ -418,11 +420,12 @@ class ProductDetailsForm(QWidget):
         self.mapper.setModel(self.model)
         self.mapper.setSubmitPolicy(QDataWidgetMapper.AutoSubmit)
 
-        # Делегат для ComboBox (name): связывает с моделью по тексту
+        # Делегат для ComboBox (category): связывает с моделью по тексту
         self._combo_delegate = ComboTextDelegate(self)
 
         self.mapper.addMapping(self.editNumber, 0)  # number — read-only
-        self.mapper.addMapping(self.comboName,  1)  # name
+        self.mapper.addMapping(self.comboCategory, 1)  # category (CHECK-список)
+        self.mapper.addMapping(self.editName, 3)       # name (свободный текст)
         # Для units используется ListWidget. QDataWidgetMapper не
         # умеет его мапить стандартно, поэтому синхронизируем вручную:
         #   модель → список: в _on_row_changed

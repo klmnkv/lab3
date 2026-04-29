@@ -37,6 +37,7 @@
      </item>
      <item>
       <widget class="QComboBox" name="comboColumn">
+       <item><property name="text"><string>Категория</string></property></item>
        <item><property name="text"><string>Название</string></property></item>
        <item><property name="text"><string>Ед. изм.</string></property></item>
       </widget>
@@ -66,7 +67,7 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>ℹ️ Допустимые названия: сахар, мука, масло, молоко, хлеб. Единицы: кг, л, шт.</string>
+      <string>ℹ️ Категории: сахар, мука, масло, молоко, хлеб, другое. Единицы: кг, л, шт. «Название» — произвольный текст.</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
      <property name="styleSheet">

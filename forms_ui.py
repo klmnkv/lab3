@@ -43,7 +43,9 @@ BRANCH_SEARCH_COLS = {
 }
 
 PRODUCT_SEARCH_COLS = {
-    "Название": "name", "Ед. изм.": "units"
+    "Категория": "category",
+    "Название": "name",
+    "Ед. изм.": "units",
 }
 
 SHOP_SEARCH_COLS = {
@@ -147,8 +149,9 @@ class ProductForm(QWidget):
         self.model.select()
 
         self.model.setHeaderData(0, Qt.Horizontal, "№")
-        self.model.setHeaderData(1, Qt.Horizontal, "Название")
+        self.model.setHeaderData(1, Qt.Horizontal, "Категория")
         self.model.setHeaderData(2, Qt.Horizontal, "Ед. изм.")
+        self.model.setHeaderData(3, Qt.Horizontal, "Название")
 
         self.tableView.setModel(self.model)
         self.tableView.horizontalHeader().setStretchLastSection(True)
@@ -499,7 +502,7 @@ class ShopProductForm(QWidget):
             self.sp_model.setHeaderData(c, Qt.Horizontal, n)
 
         self._products = self._load_products()
-        self._product_name_to_id = {n: i for i, n in self._products}
+        self._product_label_to_id = {n: i for i, n in self._products}
 
         self.spView.setModel(self.sp_model)
         self.spView.setItemDelegateForColumn(
@@ -519,12 +522,19 @@ class ShopProductForm(QWidget):
             self.shopView.selectRow(0)
 
     def _load_products(self):
-        """Загрузить справочник продуктов [(id, name), ...] один раз."""
+        """Загрузить справочник продуктов [(id, label), ...] один раз.
+        label = «категория» или «категория — название», если name задан."""
         items = []
         q = QSqlQuery()
-        if q.exec_('SELECT number, name FROM "Product" ORDER BY number'):
+        if q.exec_(
+            'SELECT number, category, name FROM "Product" ORDER BY number'
+        ):
             while q.next():
-                items.append((int(q.value(0)), str(q.value(1))))
+                pid = int(q.value(0))
+                category = str(q.value(1) or "").strip()
+                name = str(q.value(2) or "").strip()
+                label = f"{category} — {name}" if name else category
+                items.append((pid, label))
         return items
 
     def _autofill_shop_on_insert(self, parent, first, last):
