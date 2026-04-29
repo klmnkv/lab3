@@ -151,8 +151,11 @@ class BranchOfficeDetailsForm(QWidget):
         # AutoSubmit не срабатывает и правка не доедет до БД.
         self.navbar.about_to_save.connect(self.mapper.submit)
 
-        self.mapper.addMapping(self.editNumber,    0)  # number      (read-only)
-        # Скрыть PK у родительской таблицы Branch_office
+        # Колонка number (PK, IDENTITY ALWAYS) у родительской таблицы
+        # Branch_office не отображается и не редактируется — ни мапить
+        # её на editNumber, ни показывать поле не нужно. Иначе при
+        # mapper.submit() в модель уйдёт пустая строка, generated-флаг
+        # колонки сбросится, и PostgreSQL вернёт 428C9.
         self.editNumber.hide()
         self.lblNumber.hide()
         self.mapper.addMapping(self.editName,      1)  # name
@@ -434,8 +437,8 @@ class ProductDetailsForm(QWidget):
         # Делегат для ComboBox (category): связывает с моделью по тексту
         self._combo_delegate = ComboTextDelegate(self)
 
-        self.mapper.addMapping(self.editNumber, 0)  # number — read-only
-        # Скрыть PK у родительской таблицы Product
+        # PK у Product тоже не мапим: поле скрыто, mapper.submit() не
+        # должен писать пустой "number" обратно в модель.
         self.editNumber.hide()
         self.lblNumber.hide()
         self.mapper.addMapping(self.comboCategory, 1)  # category (CHECK-список)
