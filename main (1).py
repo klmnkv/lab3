@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtSql import QSqlDatabase
 from PyQt5.QtCore import Qt
 
-from db_config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+from db_config import DB_HOST, DB_PORT, DB_NAME, DB_USER
 
 # Формы ЛР №3 (то, что уже было)
 from forms_ui import (
@@ -32,28 +32,35 @@ from forms_ui import (
 # Формы ЛР №2 (новые)
 from forms_lab2 import BranchOfficeDetailsForm, ProductDetailsForm
 
+from login_dialog import LoginDialog
+
 
 # ============================================================
 def connect_db() -> bool:
-    """Подключение к PostgreSQL через QPSQL-драйвер."""
+    """Авторизация через PostgreSQL: учётные данные вводит пользователь.
+
+    Показываем диалог логина — он сам проверяет креды, открывая пробное
+    соединение. Если диалог принят, открываем основное соединение
+    приложения с теми же параметрами.
+    """
+    dialog = LoginDialog()
+    if dialog.exec_() != LoginDialog.Accepted:
+        return False
+
+    creds = dialog.credentials
     db = QSqlDatabase.addDatabase("QPSQL")
-    db.setHostName(DB_HOST)
-    db.setPort(DB_PORT)
-    db.setDatabaseName(DB_NAME)
-    db.setUserName(DB_USER)
-    db.setPassword(DB_PASSWORD)
+    db.setHostName(creds["host"])
+    db.setPort(creds["port"])
+    db.setDatabaseName(creds["db_name"])
+    db.setUserName(creds["username"])
+    db.setPassword(creds["password"])
 
     if not db.open():
         QMessageBox.critical(
             None,
             "Ошибка подключения к БД",
-            f"Не удалось подключиться к {DB_NAME}@{DB_HOST}:{DB_PORT}\n\n"
-            f"Ошибка: {db.lastError().text()}\n\n"
-            f"Проверьте:\n"
-            f"  1) PostgreSQL запущен (sudo systemctl status postgresql)\n"
-            f"  2) БД '{DB_NAME}' существует "
-            f"(psql -U postgres -f setup_db.sql)\n"
-            f"  3) Логин/пароль в db_config.py"
+            "Не удалось открыть основное соединение после авторизации.\n\n"
+            f"Ошибка: {db.lastError().text()}"
         )
         return False
     return True
@@ -65,11 +72,20 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(
+        base_title = (
             "Лабораторные работы №2 и №3 — educationDB (PyQt5 + PostgreSQL)"
         )
         self.resize(1100, 700)
-        self.statusBar().showMessage("Подключено к educationDB", 5000)
+        db = QSqlDatabase.database()
+        user = db.userName() if db.isValid() else ""
+        if user:
+            self.setWindowTitle(f"{base_title} — пользователь: {user}")
+            self.statusBar().showMessage(
+                f"Подключено к educationDB как «{user}»", 5000
+            )
+        else:
+            self.setWindowTitle(base_title)
+            self.statusBar().showMessage("Подключено к educationDB", 5000)
 
         self._create_menu()
         self._create_toolbar()
