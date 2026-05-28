@@ -4,7 +4,7 @@ main.py — Главное приложение.
 
 Включает формы из:
     - ЛР №2 (forms_lab2):  родительские таблицы Branch_office, Product
-                            в виде Details + DataGridView
+                            в виде формы Details + таблицы (QTableView)
     - ЛР №3 (forms_ui):    связанные таблицы (Master-Detail, M:M, VIEW)
 
 БД: educationDB (PostgreSQL).
@@ -76,9 +76,9 @@ class MainWindow(QMainWindow):
             "<hr>"
             "<table cellpadding='6'>"
             "<tr><td colspan='2'><b>📘 ЛР №2</b> — родительские таблицы "
-            "(Details + DataGridView):</td></tr>"
+            "(Details + таблица записей):</td></tr>"
             "<tr><td>📁</td><td>Филиалы — карточка + фото директора</td></tr>"
-            "<tr><td>📦</td><td>Продукты — карточка + ComboBox/ListBox</td></tr>"
+            "<tr><td>📦</td><td>Продукты — карточка + ComboBox/список</td></tr>"
             "<tr><td colspan='2'><br/><b>📗 ЛР №3</b> — связанные таблицы:</td></tr>"
             "<tr><td>🏪</td><td>Магазины (Master-Detail 1:M)</td></tr>"
             "<tr><td>🛒</td><td>Товары в магазинах (M:M)</td></tr>"
@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         act_branch_d = QAction("📁 Филиалы — карточка (Details)", self)
         act_branch_d.setShortcut("Ctrl+Shift+1")
         act_branch_d.setStatusTip(
-            "Branch_office: Details + фото + ComboBox + DataGridView"
+            "Branch_office: Details + фото + ComboBox + таблица"
         )
         act_branch_d.triggered.connect(self._open_branch_details)
         lab2_menu.addAction(act_branch_d)
@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         act_product_d = QAction("📦 Продукты — карточка (Details)", self)
         act_product_d.setShortcut("Ctrl+Shift+2")
         act_product_d.setStatusTip(
-            "Product: Details + ComboBox/ListBox + DataGridView"
+            "Product: Details + ComboBox/список + таблица"
         )
         act_product_d.triggered.connect(self._open_product_details)
         lab2_menu.addAction(act_product_d)
@@ -256,8 +256,8 @@ class MainWindow(QMainWindow):
             "<b>Лабораторные работы №2 и №3</b><br><br>"
             "Стек: Python 3 + PyQt5 + PostgreSQL<br><br>"
             "<b>ЛР №2:</b> родительские таблицы (Branch_office, Product) — "
-            "Details-формы с PictureBox, ComboBox/ListBox, "
-            "DataGridView и BindingNavigator.<br><br>"
+            "Details-формы с полем для изображения (QLabel + QPixmap), "
+            "ComboBox/QListWidget, QTableView и панелью навигации.<br><br>"
             "<b>ЛР №3:</b> связанные таблицы — Master-Detail (1:M), "
             "M:M через промежуточную таблицу, VIEW."
         )

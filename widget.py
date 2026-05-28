@@ -2,7 +2,7 @@
 widget.py — Переиспользуемые виджеты для приложения educationDB.
 
 Содержит:
-  - NavigationToolbar  — аналог BindingNavigator (Windows Forms)
+  - NavigationToolbar  — панель навигации по записям модели
   - SearchPanel        — панель поиска и фильтрации
   - ReadOnlyDelegate   — делегат для блокировки редактирования отдельных колонок
   - StatusLabel         — метка для отображения статуса подключения
@@ -20,8 +20,13 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
 
+def sql_escape(value: str) -> str:
+    """Экранирует одиночные кавычки для безопасной подстановки в setFilter()."""
+    return value.replace("'", "''")
+
+
 # ============================================================
-#  NavigationToolbar — аналог BindingNavigator (Windows Forms)
+#  NavigationToolbar — панель навигации по записям модели
 # ============================================================
 class NavigationToolbar(QToolBar):
     """Панель навигации по записям таблицы:
@@ -413,7 +418,7 @@ class SearchPanel(QWidget):
             parts.append(self._base_filter)
         if val:
             # ILIKE для регистронезависимого поиска
-            parts.append(f"\"{col}\"::text ILIKE '%{val}%'")
+            parts.append(f"\"{col}\"::text ILIKE '%{sql_escape(val)}%'")
 
         filt = " AND ".join(parts) if parts else ""
         self._model.setFilter(filt)

@@ -9,15 +9,15 @@ forms_lab2.py — Формы для Лабораторной работы №2.
 Реализованные особенности (по заданию ЛР №2):
     - Несколько форм в проекте.
     - Различные элементы управления:
-        Label, QLineEdit (TextBox), QComboBox, QListWidget (ListBox),
-        QCheckBox, QLabel-PictureBox, QTableView (DataGridView),
-        NavigationToolbar (BindingNavigator).
+        QLabel, QLineEdit, QComboBox, QListWidget,
+        QCheckBox, QLabel (поле для изображения), QTableView,
+        NavigationToolbar (панель навигации).
     - Представление "Details": каждое поле — отдельный компонент,
-      синхронизирован с DataGridView внизу формы (mapper).
+      синхронизирован с таблицей (QTableView) внизу формы (mapper).
     - Работа с графическим полем: загрузка фото из файла и очистка.
-    - ComboBox/ListBox для полей с CHECK-ограничением (Product.name,
+    - ComboBox/список для полей с CHECK-ограничением (Product.name,
       Product.units).
-    - Поиск + фильтрация (как в методичке: TextBox + CheckBox Фильтр).
+    - Поиск + фильтрация (как в методичке: поле ввода + чек-бокс «Фильтр»).
     - Шаблон проектирования "Одиночка" (Singleton) для всех форм.
     - Обработка исключений при сохранении (повторяющийся регион,
       неверный формат телефона и т. п.).
@@ -34,7 +34,7 @@ from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
 from PyQt5.QtGui import QPixmap, QImage
 
-from widget import NavigationToolbar
+from widget import NavigationToolbar, sql_escape
 
 
 # Папка с .ui-файлами рядом с этим модулем
@@ -84,8 +84,8 @@ class BranchOfficeDetailsForm(QWidget):
     """Details-форма для родительской таблицы Branch_office.
 
     Структура (сверху вниз):
-        Поиск/фильтр → Details (поля + фото) → DataGridView → подсказка.
-    Навигатор записей (BindingNavigator-аналог) добавляется в код наверху.
+        Поиск/фильтр → Details (поля + фото) → таблица (QTableView) → подсказка.
+    Навигатор записей (NavigationToolbar) добавляется в код наверху.
     """
 
     _instance = None  # Singleton
@@ -135,7 +135,7 @@ class BranchOfficeDetailsForm(QWidget):
         self.tableView.setModel(self.model)
         self.tableView.hide()
 
-        # ---------- Навигатор (аналог BindingNavigator) ----------
+        # ---------- Навигатор (NavigationToolbar) ----------
         self.navbar = NavigationToolbar(self.tableView, self.model, self)
         self.layout().insertWidget(0, self.navbar)
         # При сохранении / ошибке — обновим карточку
@@ -189,7 +189,7 @@ class BranchOfficeDetailsForm(QWidget):
         self._current_photo_bytes: bytes | None = None
 
     # ------------------------------------------------------------
-    #  Синхронизация Details с выделенной строкой DataGridView
+    #  Синхронизация Details с выделенной строкой таблицы
     # ------------------------------------------------------------
     def _on_row_changed(self, current: QModelIndex, _previous: QModelIndex):
         if current.isValid():
@@ -206,7 +206,7 @@ class BranchOfficeDetailsForm(QWidget):
             self.mapper.setCurrentIndex(row)
 
     # ------------------------------------------------------------
-    #  Работа с графическим полем (PictureBox-аналог)
+    #  Работа с графическим полем (QLabel + QPixmap)
     # ------------------------------------------------------------
     def _refresh_photo(self, row: int):
         """Прочитать BYTEA из текущей строки и показать в QLabel."""
@@ -333,10 +333,10 @@ class BranchOfficeDetailsForm(QWidget):
             return
 
         # Экранируем одиночные кавычки в значении
-        safe = val.replace("'", "''")
+        safe = sql_escape(val)
 
         if self.checkBoxFilter.isChecked():
-            # Точное совпадение (как cотрудникиBindingSource.Filter)
+            # Точное совпадение (через QSqlTableModel.setFilter)
             self.model.setFilter(f'"{col}"::text = \'{safe}\'')
         else:
             # Поиск-подстрока
@@ -502,7 +502,7 @@ class ProductDetailsForm(QWidget):
             self._reset_search()
             return
 
-        safe = val.replace("'", "''")
+        safe = sql_escape(val)
 
         if self.checkBoxFilter.isChecked():
             self.model.setFilter(f'"{col}"::text = \'{safe}\'')
