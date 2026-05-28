@@ -68,7 +68,7 @@ python3 main.py
 | 8 | Вычисляемые колонки | `GENERATED` в БД + VIEW shop_full_info |
 | 9 | Подстановочные поля | `QSqlRelationalTableModel` + `QSqlRelation` |
 | 10 | Кнопка выбора филиала | `BranchSelectDialog` (QDialog) |
-| 11 | Навигация (BindingNavigator) | `NavigationToolbar` (QToolBar) |
+| 11 | Навигация по записям | `NavigationToolbar` (QToolBar) |
 | 12 | Тестирование CRUD | Встроено во все формы |
 
 ## Архитектура
@@ -90,13 +90,13 @@ MainWindow (QMainWindow)
 └── ShopFullInfoForm    — VIEW shop_full_info (только чтение)
 ```
 
-## Соответствие Windows Forms → PyQt5
+## Ключевые компоненты PyQt5
 
-| Windows Forms | PyQt5 |
-|--------------|-------|
-| DataGridView + BindingSource | QTableView + QSqlTableModel |
-| DataColumn.Expression | PostgreSQL GENERATED / VIEW |
-| Parent(FK).Field | QSqlRelationalTableModel + QSqlRelation |
-| BindingNavigator | NavigationToolbar (QToolBar + QAction) |
-| BindingSource.Filter | QSqlTableModel.setFilter() |
-| static Form | @classmethod + _instance (Singleton) |
+| Возможность                | Реализация в PyQt5 |
+|----------------------------|--------------------|
+| Таблица с CRUD-привязкой   | `QTableView` + `QSqlTableModel` |
+| Вычисляемые/производные поля | PostgreSQL `GENERATED` / `VIEW` |
+| Подстановочные поля (FK)   | `QSqlRelationalTableModel` + `QSqlRelation` |
+| Панель навигации по записям | `NavigationToolbar` (`QToolBar` + `QAction`) |
+| Фильтр модели              | `QSqlTableModel.setFilter()` |
+| Singleton-форма            | `@classmethod` + `_instance` |
