@@ -17,7 +17,8 @@ from PyQt5.QtSql import (
 from PyQt5.QtCore import Qt, QDate
 
 from widget import (
-    NavigationToolbar, ReadOnlyDelegate, MoneyDelegate, LookupComboDelegate
+    NavigationToolbar, ReadOnlyDelegate, MoneyDelegate, LookupComboDelegate,
+    sql_escape,
 )
 
 # Путь к папке с .ui файлами
@@ -62,7 +63,7 @@ def _connect_search(widget, model, col_map):
         base = getattr(widget, "_base_filter", "").strip()
         parts = [base] if base else []
         if val:
-            parts.append(f"\"{col}\"::text ILIKE '%{val}%'")
+            parts.append(f"\"{col}\"::text ILIKE '%{sql_escape(val)}%'")
         model.setFilter(" AND ".join(parts))
         model.select()
 
@@ -380,7 +381,7 @@ class ShopForm(QWidget):
         if val:
             col = SHOP_SEARCH_COLS.get(self.comboColumn.currentText(), "name")
             self.detail_model.setFilter(
-                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{val}%'"
+                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{sql_escape(val)}%'"
             )
         else:
             self.detail_model.setFilter(self._base_filter)
@@ -589,7 +590,7 @@ class ShopProductForm(QWidget):
         if val and combo is not None:
             col = SHOP_SEARCH_COLS.get(combo.currentText(), "name")
             self.sp_model.setFilter(
-                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{val}%'"
+                f"{self._base_filter} AND \"{col}\"::text ILIKE '%{sql_escape(val)}%'"
             )
         else:
             self.sp_model.setFilter(self._base_filter)

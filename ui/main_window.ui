@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1100</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Лабораторные работы №2 и №3 — educationDB (PyQt5 + PostgreSQL)</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <widget class="QLabel" name="centralLabel">
+      <property name="textFormat">
+       <enum>Qt::RichText</enum>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="text">
+       <string>&lt;h2&gt;Лабораторные работы №2 и №3&lt;/h2&gt;&lt;h3&gt;educationDB — сеть магазинов с филиалами&lt;/h3&gt;&lt;hr&gt;&lt;table cellpadding='6'&gt;&lt;tr&gt;&lt;td colspan='2'&gt;&lt;b&gt;📘 ЛР №2&lt;/b&gt; — родительские таблицы (Details + таблица записей):&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;📁&lt;/td&gt;&lt;td&gt;Филиалы — карточка + фото директора&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;📦&lt;/td&gt;&lt;td&gt;Продукты — карточка + ComboBox/список&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan='2'&gt;&lt;br/&gt;&lt;b&gt;📗 ЛР №3&lt;/b&gt; — связанные таблицы:&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;🏪&lt;/td&gt;&lt;td&gt;Магазины (Master-Detail 1:M)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;🛒&lt;/td&gt;&lt;td&gt;Товары в магазинах (M:M)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;📊&lt;/td&gt;&lt;td&gt;VIEW shop_full_info&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QLabel {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f0f4f8, stop:1 #d9e2ec
+    );
+    border: 1px solid #bcccdc;
+    border-radius: 8px;
+    padding: 30px;
+    font-size: 14px;
+}</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -15,16 +15,17 @@ main.py — Главное приложение.
 """
 
 import sys
+from PyQt5 import uic
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QAction, QMessageBox, QLabel, QMenu,
+    QApplication, QMainWindow, QAction, QMessageBox, QMenu,
 )
 from PyQt5.QtSql import QSqlDatabase
-from PyQt5.QtCore import Qt
 
 # Формы ЛР №3 (то, что уже было)
 from forms_ui import (
     BranchOfficeForm, ShopForm, ProductForm,
     ShopProductForm, ShopFullInfoForm,
+    ui_path,
 )
 
 # Формы ЛР №2 (новые)
@@ -49,10 +50,9 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        base_title = (
-            "Лабораторные работы №2 и №3 — educationDB (PyQt5 + PostgreSQL)"
-        )
-        self.resize(1100, 700)
+        uic.loadUi(ui_path("main_window.ui"), self)
+
+        base_title = self.windowTitle()
         db = QSqlDatabase.database()
         user = db.userName() if db.isValid() else ""
         if user:
@@ -61,44 +61,10 @@ class MainWindow(QMainWindow):
                 f"Подключено к educationDB как «{user}»", 5000
             )
         else:
-            self.setWindowTitle(base_title)
             self.statusBar().showMessage("Подключено к educationDB", 5000)
 
         self._create_menu()
         self._create_toolbar()
-        self._create_central()
-
-    # --------------------------------------------------------
-    def _create_central(self):
-        central = QLabel(
-            "<h2>Лабораторные работы №2 и №3</h2>"
-            "<h3>educationDB — сеть магазинов с филиалами</h3>"
-            "<hr>"
-            "<table cellpadding='6'>"
-            "<tr><td colspan='2'><b>📘 ЛР №2</b> — родительские таблицы "
-            "(Details + таблица записей):</td></tr>"
-            "<tr><td>📁</td><td>Филиалы — карточка + фото директора</td></tr>"
-            "<tr><td>📦</td><td>Продукты — карточка + ComboBox/список</td></tr>"
-            "<tr><td colspan='2'><br/><b>📗 ЛР №3</b> — связанные таблицы:</td></tr>"
-            "<tr><td>🏪</td><td>Магазины (Master-Detail 1:M)</td></tr>"
-            "<tr><td>🛒</td><td>Товары в магазинах (M:M)</td></tr>"
-            "<tr><td>📊</td><td>VIEW shop_full_info</td></tr>"
-            "</table>"
-        )
-        central.setAlignment(Qt.AlignCenter)
-        central.setStyleSheet("""
-            QLabel {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #f0f4f8, stop:1 #d9e2ec
-                );
-                border: 1px solid #bcccdc;
-                border-radius: 8px;
-                padding: 30px;
-                font-size: 14px;
-            }
-        """)
-        self.setCentralWidget(central)
 
     # --------------------------------------------------------
     def _create_menu(self):
