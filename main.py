@@ -21,8 +21,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtSql import QSqlDatabase
 from PyQt5.QtCore import Qt
 
-from db_config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-
 # Формы ЛР №3 (то, что уже было)
 from forms_ui import (
     BranchOfficeForm, ShopForm, ProductForm,
@@ -37,35 +35,12 @@ from login_dialog import LoginDialog
 
 # ============================================================
 def authorize() -> bool:
-    """Окно авторизации: сверяет введённые логин/пароль с учётной записью
-    PostgreSQL из db_config.py."""
+    """Окно авторизации (стиль pgAdmin): сам LoginDialog открывает
+    QtSql-соединение с введёнными логином/паролем. Аутентификацию
+    выполняет PostgreSQL. При успехе default-соединение остаётся
+    открытым для всех моделей приложения."""
     dialog = LoginDialog()
     return dialog.exec_() == LoginDialog.Accepted
-
-
-def connect_db() -> bool:
-    """Подключение к PostgreSQL через QPSQL-драйвер."""
-    db = QSqlDatabase.addDatabase("QPSQL")
-    db.setHostName(DB_HOST)
-    db.setPort(DB_PORT)
-    db.setDatabaseName(DB_NAME)
-    db.setUserName(DB_USER)
-    db.setPassword(DB_PASSWORD)
-
-    if not db.open():
-        QMessageBox.critical(
-            None,
-            "Ошибка подключения к БД",
-            f"Не удалось подключиться к {DB_NAME}@{DB_HOST}:{DB_PORT}\n\n"
-            f"Ошибка: {db.lastError().text()}\n\n"
-            f"Проверьте:\n"
-            f"  1) PostgreSQL запущен (sudo systemctl status postgresql)\n"
-            f"  2) БД '{DB_NAME}' существует "
-            f"(psql -U postgres -f setup_db.sql)\n"
-            f"  3) Логин/пароль в db_config.py"
-        )
-        return False
-    return True
 
 
 # ============================================================
@@ -293,12 +268,9 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    # Авторизация по учётной записи PostgreSQL из db_config.py
+    # Авторизация = подключение к БД через LoginDialog (стиль pgAdmin)
     if not authorize():
         sys.exit(0)
-
-    if not connect_db():
-        sys.exit(1)
 
     window = MainWindow()
     window.show()
