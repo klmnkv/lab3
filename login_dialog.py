@@ -6,7 +6,17 @@ QSqlDatabase-соединение (драйвер QPSQL) с host/port/dbname и�
 и введёнными кредами. Аутентификацию выполняет сам PostgreSQL (роли).
 При успехе соединение остаётся открытым и глобальным (default connection)
 для всех моделей; при ошибке окно не закрывается — можно ввести заново.
+
+После успешного входа логин/пароль сохраняются в
+~/.config/lab3/credentials.json (на POSIX — chmod 600), и при следующем
+запуске поля диалога предзаполняются. Если файла нет или он повреждён —
+логин по умолчанию берётся из db_config.DB_USER, пароль пустой.
 """
+
+import json
+import os
+import sys
+from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtSql import QSqlDatabase
@@ -18,6 +28,38 @@ from PyQt5.QtWidgets import (
 from db_config import DB_HOST, DB_PORT, DB_NAME, DB_USER
 
 
+def _credentials_path() -> Path:
+    return Path.home() / ".config" / "lab3" / "credentials.json"
+
+
+def _load_credentials():
+    """Возвращает (user, password) из сохранённого файла или (None, None)."""
+    path = _credentials_path()
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        user = data.get("user")
+        password = data.get("password")
+        if isinstance(user, str) and isinstance(password, str):
+            return user, password
+    except (OSError, ValueError):
+        pass
+    return None, None
+
+
+def _save_credentials(user: str, password: str) -> None:
+    """Пишет JSON с кредами; на POSIX выставляет права 0o600 (только владелец)."""
+    path = _credentials_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump({"user": user, "password": password}, f)
+        if os.name == "posix":
+            os.chmod(path, 0o600)
+    except OSError as e:
+        print(f"[login_dialog] не удалось сохранить креды: {e}", file=sys.stderr)
+
+
 class LoginDialog(QDialog):
     """Диалог ввода логина/пароля учётной записи PostgreSQL."""
 
@@ -27,18 +69,19 @@ class LoginDialog(QDialog):
             f"Авторизация — {DB_NAME} на {DB_HOST}:{DB_PORT}"
         )
         self.setModal(True)
-        self.setMinimumWidth(340)
+        self.setMinimumWidth(360)
 
         title = QLabel(
             "<h3>Вход в программу</h3>"
             f"<p>Подключение к <b>{DB_NAME}</b> на "
             f"<b>{DB_HOST}:{DB_PORT}</b>.<br>"
             "Введите логин и пароль роли PostgreSQL.</p>"
+            "<p><small>После успешного входа данные сохраняются в "
+            "<code>~/.config/lab3/credentials.json</code>.</small></p>"
         )
         title.setTextFormat(Qt.RichText)
 
         self.user_edit = QLineEdit()
-        self.user_edit.setText(DB_USER)
         self.pass_edit = QLineEdit()
         self.pass_edit.setEchoMode(QLineEdit.Password)
         self.show_pass = QCheckBox("Показать пароль")
@@ -65,7 +108,14 @@ class LoginDialog(QDialog):
         layout.addLayout(form)
         layout.addLayout(buttons)
 
-        self.pass_edit.setFocus()
+        saved_user, saved_password = _load_credentials()
+        if saved_user is not None:
+            self.user_edit.setText(saved_user)
+            self.pass_edit.setText(saved_password)
+            self.btn_ok.setFocus()
+        else:
+            self.user_edit.setText(DB_USER)
+            self.pass_edit.setFocus()
 
     def _toggle_password(self, checked: bool):
         self.pass_edit.setEchoMode(
@@ -121,4 +171,5 @@ class LoginDialog(QDialog):
             self.pass_edit.setFocus()
             return
 
+        _save_credentials(user, password)
         self.accept()
