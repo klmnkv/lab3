@@ -17,7 +17,6 @@ forms_lab2.py — Формы для Лабораторной работы №2.
     - Работа с графическим полем: загрузка фото из файла и очистка.
     - ComboBox/список для полей с CHECK-ограничением (Product.name,
       Product.units).
-    - Поиск + фильтрация (как в методичке: поле ввода + чек-бокс «Фильтр»).
     - Шаблон проектирования "Одиночка" (Singleton) для всех форм.
     - Обработка исключений при сохранении (повторяющийся регион,
       неверный формат телефона и т. п.).
@@ -34,7 +33,7 @@ from PyQt5.QtSql import QSqlTableModel
 from PyQt5.QtCore import Qt, QByteArray, QDate, QModelIndex
 from PyQt5.QtGui import QPixmap, QImage
 
-from widget import NavigationToolbar, sql_escape
+from widget import NavigationToolbar
 
 
 # Папка с .ui-файлами рядом с этим модулем
@@ -84,20 +83,11 @@ class BranchOfficeDetailsForm(QWidget):
     """Details-форма для родительской таблицы Branch_office.
 
     Структура (сверху вниз):
-        Поиск/фильтр → Details (поля + фото) → таблица (QTableView) → подсказка.
+        Details (поля + фото) → таблица (QTableView) → подсказка.
     Навигатор записей (NavigationToolbar) добавляется в код наверху.
     """
 
     _instance = None  # Singleton
-
-    # Имена колонок в БД (для фильтра по выбранной в ComboBox колонке)
-    SEARCH_COLS = {
-        "Название": "name",
-        "Регион": "region",
-        "Населённый пункт": "locality",
-        "Адрес": "address",
-        "Директор": "director's name",
-    }
 
     @classmethod
     def instance(cls):
@@ -174,12 +164,6 @@ class BranchOfficeDetailsForm(QWidget):
         if self.model.rowCount() > 0:
             self.tableView.selectRow(0)
             self.mapper.toFirst()
-
-        # ---------- Поиск/фильтр ----------
-        self.btnFind.clicked.connect(self._apply_search)
-        self.searchInput.returnPressed.connect(self._apply_search)
-        self.btnReset.clicked.connect(self._reset_search)
-        self.checkBoxFilter.stateChanged.connect(self._apply_search)
 
         # ---------- Работа с фото ----------
         self.btnOpenPhoto.clicked.connect(self._open_photo)
@@ -320,48 +304,6 @@ class BranchOfficeDetailsForm(QWidget):
         self._set_photo_pixmap(None)
         self.checkBoxHasPhoto.setChecked(False)
 
-    # ------------------------------------------------------------
-    #  Поиск и фильтрация
-    # ------------------------------------------------------------
-    def _apply_search(self):
-        val = self.searchInput.text().strip()
-        col_label = self.comboColumn.currentText()
-        col = self.SEARCH_COLS.get(col_label, "name")
-
-        if not val:
-            self._reset_search()
-            return
-
-        # Экранируем одиночные кавычки в значении
-        safe = sql_escape(val)
-
-        if self.checkBoxFilter.isChecked():
-            # Точное совпадение (через QSqlTableModel.setFilter)
-            self.model.setFilter(f'"{col}"::text = \'{safe}\'')
-        else:
-            # Поиск-подстрока
-            self.model.setFilter(f'"{col}"::text ILIKE \'%{safe}%\'')
-
-        if not self.model.select():
-            QMessageBox.warning(
-                self, "Ошибка фильтрации",
-                self.model.lastError().text(),
-            )
-            return
-
-        if self.model.rowCount() == 0:
-            QMessageBox.information(
-                self, "Поиск", "Нет записей, удовлетворяющих условию.",
-            )
-
-    def _reset_search(self):
-        self.searchInput.clear()
-        self.checkBoxFilter.setChecked(False)
-        self.model.setFilter("")
-        self.model.select()
-        if self.model.rowCount() > 0:
-            self.tableView.selectRow(0)
-
 
 # ============================================================
 #  2. Форма «Продукты (Details)» — Product
@@ -374,12 +316,6 @@ class ProductDetailsForm(QWidget):
     """
 
     _instance = None
-
-    SEARCH_COLS = {
-        "Категория": "category",
-        "Название": "name",
-        "Ед. изм.": "units",
-    }
 
     @classmethod
     def instance(cls):
@@ -449,12 +385,6 @@ class ProductDetailsForm(QWidget):
             self.tableView.selectRow(0)
             self.mapper.toFirst()
 
-        # ---------- Поиск/фильтр ----------
-        self.btnFind.clicked.connect(self._apply_search)
-        self.searchInput.returnPressed.connect(self._apply_search)
-        self.btnReset.clicked.connect(self._reset_search)
-        self.checkBoxFilter.stateChanged.connect(self._apply_search)
-
     # ------------------------------------------------------------
     def _on_row_changed(self, current: QModelIndex, _previous: QModelIndex):
         if current.isValid():
@@ -489,42 +419,3 @@ class ProductDetailsForm(QWidget):
             self.tableView.selectRow(0)
         if row >= 0:
             self.mapper.setCurrentIndex(row)
-
-    # ------------------------------------------------------------
-    #  Поиск/фильтр
-    # ------------------------------------------------------------
-    def _apply_search(self):
-        val = self.searchInput.text().strip()
-        col_label = self.comboColumn.currentText()
-        col = self.SEARCH_COLS.get(col_label, "name")
-
-        if not val:
-            self._reset_search()
-            return
-
-        safe = sql_escape(val)
-
-        if self.checkBoxFilter.isChecked():
-            self.model.setFilter(f'"{col}"::text = \'{safe}\'')
-        else:
-            self.model.setFilter(f'"{col}"::text ILIKE \'%{safe}%\'')
-
-        if not self.model.select():
-            QMessageBox.warning(
-                self, "Ошибка фильтрации",
-                self.model.lastError().text(),
-            )
-            return
-
-        if self.model.rowCount() == 0:
-            QMessageBox.information(
-                self, "Поиск", "Нет записей, удовлетворяющих условию.",
-            )
-
-    def _reset_search(self):
-        self.searchInput.clear()
-        self.checkBoxFilter.setChecked(False)
-        self.model.setFilter("")
-        self.model.select()
-        if self.model.rowCount() > 0:
-            self.tableView.selectRow(0)
