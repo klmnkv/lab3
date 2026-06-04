@@ -17,7 +17,7 @@ main.py — Главное приложение.
 import sys
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QAction, QMessageBox, QMenu,
+    QApplication, QMainWindow, QMessageBox, QMenu,
 )
 from PyQt5.QtSql import QSqlDatabase
 
@@ -63,97 +63,33 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage("Подключено к educationDB", 5000)
 
-        self._create_menu()
-        self._create_toolbar()
+        self._wire_actions()
 
     # --------------------------------------------------------
-    def _create_menu(self):
-        menu = self.menuBar()
-
-        # ----- Меню «ЛР №2» (новое) -----
-        lab2_menu = menu.addMenu("ЛР №2 (родительские таблицы)")
-
-        act_branch_d = QAction("📁 Филиалы — карточка (Details)", self)
-        act_branch_d.setShortcut("Ctrl+Shift+1")
-        act_branch_d.setStatusTip(
-            "Branch_office: Details + фото + ComboBox + таблица"
-        )
-        act_branch_d.triggered.connect(self._open_branch_details)
-        lab2_menu.addAction(act_branch_d)
-
-        act_product_d = QAction("📦 Продукты — карточка (Details)", self)
-        act_product_d.setShortcut("Ctrl+Shift+2")
-        act_product_d.setStatusTip(
-            "Product: Details + ComboBox/список + таблица"
-        )
-        act_product_d.triggered.connect(self._open_product_details)
-        lab2_menu.addAction(act_product_d)
-
-        # ----- Меню «ЛР №3» (то, что было) -----
-        forms_menu = menu.addMenu("ЛР №3 (связанные таблицы)")
-
-        act_branch = QAction("📁 Филиалы (упрощённо)", self)
-        act_branch.setShortcut("Ctrl+1")
-        act_branch.triggered.connect(self._open_branch)
-        forms_menu.addAction(act_branch)
-
-        act_shop = QAction("🏪 Магазины (1:M)", self)
-        act_shop.setShortcut("Ctrl+2")
-        act_shop.triggered.connect(self._open_shop)
-        forms_menu.addAction(act_shop)
-
-        act_product = QAction("📦 Продукты (упрощённо)", self)
-        act_product.setShortcut("Ctrl+3")
-        act_product.triggered.connect(self._open_product)
-        forms_menu.addAction(act_product)
-
-        act_sp = QAction("🛒 Товары в магазинах (M:M)", self)
-        act_sp.setShortcut("Ctrl+4")
-        act_sp.triggered.connect(self._open_shop_product)
-        forms_menu.addAction(act_sp)
-
-        forms_menu.addSeparator()
-
-        act_view = QAction("📊 Полная информация (VIEW)", self)
-        act_view.setShortcut("Ctrl+5")
-        act_view.triggered.connect(self._open_view)
-        forms_menu.addAction(act_view)
-
-        forms_menu.addSeparator()
-        act_quit = QAction("Выход", self)
-        act_quit.setShortcut("Ctrl+Q")
-        act_quit.triggered.connect(self.close)
-        forms_menu.addAction(act_quit)
-
-        # ----- Справка -----
-        help_menu = menu.addMenu("Справка")
-        act_about = QAction("О программе", self)
-        act_about.triggered.connect(self._about)
-        help_menu.addAction(act_about)
-
-    def _create_toolbar(self):
-        tb = self.addToolBar("Основное")
-        tb.setMovable(False)
-
-        items = [
-            ("📁 Филиалы (карт.)",  "ЛР №2: Branch_office Details", self._open_branch_details),
-            ("📦 Продукты (карт.)", "ЛР №2: Product Details",       self._open_product_details),
-            None,  # разделитель
-            ("📁 Филиалы",          "ЛР №3: упрощённый вид",         self._open_branch),
-            ("🏪 Магазины",         "ЛР №3: Master-Detail 1:M",      self._open_shop),
-            ("📦 Продукты",         "ЛР №3: упрощённый вид",         self._open_product),
-            ("🛒 Товары",           "ЛР №3: M:M",                    self._open_shop_product),
-            ("📊 VIEW",             "ЛР №3: представление",          self._open_view),
+    def _wire_actions(self):
+        """Подключить QAction'ы из main_window.ui к слотам."""
+        wiring = [
+            # Меню
+            (self.actBranchDetails,   self._open_branch_details),
+            (self.actProductDetails,  self._open_product_details),
+            (self.actBranchSimple,    self._open_branch),
+            (self.actShop,            self._open_shop),
+            (self.actProductSimple,   self._open_product),
+            (self.actShopProduct,     self._open_shop_product),
+            (self.actView,            self._open_view),
+            (self.actQuit,            self.close),
+            (self.actAbout,           self._about),
+            # Тулбар
+            (self.actTbBranchDetails, self._open_branch_details),
+            (self.actTbProductDetails, self._open_product_details),
+            (self.actTbBranch,        self._open_branch),
+            (self.actTbShop,          self._open_shop),
+            (self.actTbProduct,       self._open_product),
+            (self.actTbShopProduct,   self._open_shop_product),
+            (self.actTbView,          self._open_view),
         ]
-        for it in items:
-            if it is None:
-                tb.addSeparator()
-                continue
-            text, tip, slot = it
-            act = QAction(text, self)
-            act.setToolTip(tip)
-            act.triggered.connect(slot)
-            tb.addAction(act)
+        for action, slot in wiring:
+            action.triggered.connect(slot)
 
     # --------------------------------------------------------
     #  Слоты — открытие форм через Singleton
